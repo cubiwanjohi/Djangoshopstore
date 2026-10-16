@@ -1,0 +1,45 @@
+{% extends 'store/base.html' %}
+
+{% block title %}{{ product.name }} &middot; ShopStore{% endblock %}
+
+{% block content %}
+<p class="breadcrumb"><a href="{% url 'product_list' %}">&larr; Back to shop</a></p>
+
+<article class="detail">
+    <div class="detail-media">
+        {% if product.image %}
+            <img src="{{ product.image.url }}" alt="{{ product.name }}">
+        {% else %}
+            <div class="placeholder">{{ product.name|first|upper }}</div>
+        {% endif %}
+    </div>
+
+    <div class="detail-info">
+        <h1>{{ product.name }}</h1>
+        <div class="price price-lg">KSh {{ product.price|floatformat:"-2g" }}</div>
+
+        {% if product.stock == 0 %}
+            <div class="stock out">Out of stock</div>
+        {% elif product.stock <= 5 %}
+            <div class="stock low">Only {{ product.stock }} left</div>
+        {% else %}
+            <div class="stock">In stock</div>
+        {% endif %}
+
+        {% if product.description %}
+        <p class="description">{{ product.description|linebreaksbr }}</p>
+        {% endif %}
+
+        {% if product.stock > 0 %}
+        <form action="{% url 'cart_add' product.pk %}" method="post">
+            {% csrf_token %}
+            <button class="btn" type="submit">Add to cart</button>
+        </form>
+        {% else %}
+        <button class="btn" type="button" disabled>Out of stock</button>
+        {% endif %}
+
+        <p class="muted small">Pay with M-Pesa at checkout.</p>
+    </div>
+</article>
+{% endblock %}

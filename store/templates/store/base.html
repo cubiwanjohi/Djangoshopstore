@@ -1,0 +1,28 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}ShopStore{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'store/style.css' %}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <a class="brand" href="{% url 'product_list' %}">Shop<span>Store</span></a>
+            <nav class="nav" aria-label="Main">
+                <a href="{% url 'product_list' %}"{% if request.resolver_match.url_name == 'product_list' %} class="active"{% endif %}>Shop</a>
+                <a href="{% url 'cart_view' %}"{% if request.resolver_match.url_name == 'cart_view' %} class="active"{% endif %}>Cart{% if cart_count %}<span class="badge" aria-label="{{ cart_count }} items in cart">{{ cart_count }}</span>{% endif %}</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">ShopStore &middot; Pay with M-Pesa</div>
+    </footer>
+</body>
+</html>

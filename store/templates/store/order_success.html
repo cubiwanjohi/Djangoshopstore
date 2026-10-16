@@ -1,0 +1,44 @@
+{% extends 'store/base.html' %}
+
+{% block title %}Order #{{ order.id }} &middot; ShopStore{% endblock %}
+
+{% block content %}
+<div class="confirmation">
+    <h1>Thank you, {{ order.customer_name }}!</h1>
+    <p class="muted">Order #{{ order.id }} has been received.</p>
+
+    {% if payment_prompt_sent %}
+    <div class="notice">
+        <h2>Complete your payment on your phone</h2>
+        <p>We sent an M-Pesa prompt to <strong>{{ payment.mpesa_phone }}</strong>. Enter your M-Pesa PIN to finish paying. Your order is confirmed once the payment is received.</p>
+    </div>
+    {% else %}
+    <div class="notice warn">
+        <h2>We could not start the M-Pesa payment</h2>
+        <p>Your order was not charged. Please contact us and quote order #{{ order.id }}.</p>
+    </div>
+    {% endif %}
+
+    <section class="card-box">
+        <h2>Your order</h2>
+        {% for item in order.items.all %}
+        <div class="summary-row">
+            <span>{{ item.product.name }} &times; {{ item.quantity }}</span>
+            <span>KSh {{ item.subtotal|floatformat:"-2g" }}</span>
+        </div>
+        {% endfor %}
+        <div class="summary-total">
+            <span>Total</span>
+            <span>KSh {{ order.total|floatformat:"-2g" }}</span>
+        </div>
+        <p class="muted small">
+            Delivery to {{ order.shipping_address }}, {{ order.shipping_city }}<br>
+            Updates will be sent to {{ order.customer_email }}
+        </p>
+    </section>
+
+    <div class="actions">
+        <a class="btn" href="{% url 'product_list' %}">Continue shopping</a>
+    </div>
+</div>
+{% endblock %}

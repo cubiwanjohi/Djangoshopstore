@@ -1,0 +1,50 @@
+{% extends 'store/base.html' %}
+
+{% block title %}Shop &middot; ShopStore{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Products</h1>
+
+{% if products %}
+<div class="grid">
+    {% for product in products %}
+    <article class="card">
+        <a class="card-media" href="{% url 'product_detail' product.pk %}">
+            {% if product.image %}
+                <img src="{{ product.image.url }}" alt="{{ product.name }}" loading="lazy">
+            {% else %}
+                <div class="placeholder">{{ product.name|first|upper }}</div>
+            {% endif %}
+        </a>
+        <div class="card-body">
+            <h2 class="card-title"><a href="{% url 'product_detail' product.pk %}">{{ product.name }}</a></h2>
+            <div class="price">KSh {{ product.price|floatformat:"-2g" }}</div>
+
+            {% if product.stock == 0 %}
+                <div class="stock out">Out of stock</div>
+            {% elif product.stock <= 5 %}
+                <div class="stock low">Only {{ product.stock }} left</div>
+            {% else %}
+                <div class="stock">In stock</div>
+            {% endif %}
+
+            <div class="card-actions">
+                {% if product.stock > 0 %}
+                <form action="{% url 'cart_add' product.pk %}" method="post">
+                    {% csrf_token %}
+                    <button class="btn btn-block" type="submit">Add to cart</button>
+                </form>
+                {% else %}
+                <button class="btn btn-block" type="button" disabled>Out of stock</button>
+                {% endif %}
+            </div>
+        </div>
+    </article>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+    <p>There are no products available right now. Please check back soon.</p>
+</div>
+{% endif %}
+{% endblock %}

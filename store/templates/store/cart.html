@@ -1,0 +1,45 @@
+{% extends 'store/base.html' %}
+
+{% block title %}Your cart &middot; ShopStore{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Your cart</h1>
+
+{% if items %}
+<div class="cart">
+    <div class="cart-lines">
+        {% for item in items %}
+        <div class="cart-line">
+            <a class="thumb" href="{% url 'product_detail' item.product.pk %}">
+                {% if item.product.image %}
+                    <img src="{{ item.product.image.url }}" alt="{{ item.product.name }}">
+                {% else %}
+                    <div class="placeholder small">{{ item.product.name|first|upper }}</div>
+                {% endif %}
+            </a>
+            <div class="line-info">
+                <a class="line-name" href="{% url 'product_detail' item.product.pk %}">{{ item.product.name }}</a>
+                <div class="muted small">KSh {{ item.product.price|floatformat:"-2g" }} each &middot; Qty {{ item.quantity }}</div>
+            </div>
+            <div class="line-total">KSh {{ item.subtotal|floatformat:"-2g" }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <aside class="summary">
+        <h2>Order summary</h2>
+        <div class="summary-total">
+            <span>Total</span>
+            <span>KSh {{ total|floatformat:"-2g" }}</span>
+        </div>
+        <a class="btn btn-block" href="{% url 'checkout' %}">Proceed to checkout</a>
+        <a class="btn btn-outline btn-block" href="{% url 'product_list' %}">Continue shopping</a>
+    </aside>
+</div>
+{% else %}
+<div class="empty">
+    <p>Your cart is empty.</p>
+    <a class="btn" href="{% url 'product_list' %}">Browse products</a>
+</div>
+{% endif %}
+{% endblock %}

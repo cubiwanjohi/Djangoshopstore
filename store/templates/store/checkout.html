@@ -1,0 +1,83 @@
+{% extends 'store/base.html' %}
+
+{% block title %}Checkout &middot; ShopStore{% endblock %}
+
+{% block content %}
+<h1 class="page-title">Checkout</h1>
+
+{% if error %}
+<div class="alert alert-error" role="alert">{{ error }}</div>
+{% endif %}
+
+<div class="checkout">
+    <form id="checkout-form" class="form-card" method="post" novalidate>
+        {% csrf_token %}
+
+        <fieldset>
+            <legend>Contact</legend>
+            <div class="field">
+                <label for="name">Full name</label>
+                <input id="name" name="name" type="text" maxlength="200" autocomplete="name" value="{{ form.name }}" required>
+            </div>
+            <div class="field">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" value="{{ form.email }}" required>
+                <p class="hint">We will send your order updates here.</p>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Delivery</legend>
+            <div class="field">
+                <label for="address">Delivery address</label>
+                <input id="address" name="address" type="text" maxlength="255" autocomplete="street-address" value="{{ form.address }}" required>
+            </div>
+            <div class="form-row">
+                <div class="field">
+                    <label for="city">Town or city</label>
+                    <input id="city" name="city" type="text" maxlength="100" autocomplete="address-level2" value="{{ form.city }}" required>
+                </div>
+                <div class="field">
+                    <label for="phone">Contact phone</label>
+                    <input id="phone" name="phone" type="tel" maxlength="20" autocomplete="tel" value="{{ form.phone }}" required>
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Payment</legend>
+            <div class="field">
+                <label for="mpesa_phone">M-Pesa phone number</label>
+                <input id="mpesa_phone" name="mpesa_phone" type="tel" maxlength="20" autocomplete="tel" placeholder="0712345678" value="{{ form.mpesa_phone }}" required>
+                <p class="hint">You will get an M-Pesa prompt on this number. Enter your PIN on your phone to pay.</p>
+            </div>
+        </fieldset>
+
+        <button id="place-order" class="btn btn-block" type="submit">Place order &middot; Pay KSh {{ total|floatformat:"-2g" }}</button>
+    </form>
+
+    <aside class="summary">
+        <h2>Order summary</h2>
+        {% for item in items %}
+        <div class="summary-row">
+            <span>{{ item.product.name }} &times; {{ item.quantity }}</span>
+            <span>KSh {{ item.subtotal|floatformat:"-2g" }}</span>
+        </div>
+        {% endfor %}
+        <div class="summary-total">
+            <span>Total</span>
+            <span>KSh {{ total|floatformat:"-2g" }}</span>
+        </div>
+        <a class="btn btn-outline btn-block" href="{% url 'cart_view' %}">Back to cart</a>
+    </aside>
+</div>
+
+<script>
+    // Prevent double submissions, which would create two orders and two M-Pesa prompts.
+    document.getElementById('checkout-form').addEventListener('submit', function () {
+        var button = document.getElementById('place-order');
+        button.disabled = true;
+        button.textContent = 'Placing your order\u2026';
+    });
+</script>
+{% endblock %}
