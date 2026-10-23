@@ -207,15 +207,15 @@ class StoreViewTests(TestCase):
             response.context["total"],
             Decimal("24000.00"),
         )
+    
+def test_empty_checkout_page(self):
+    response = self.client.get(reverse("checkout"))
 
-    def test_empty_checkout_page(self):
-        # An empty cart should redirect to the product catalogue.
-        response = self.client.get(reverse("checkout"))
-
-        self.assertRedirects(
-            response,
-            reverse("product_list"),
-        )
+    self.assertEqual(response.status_code, 302)
+    self.assertRedirects(
+        response,
+        reverse("product_list"),
+    )
 
 
 class CheckoutTests(TestCase):
