@@ -1,3 +1,4 @@
+
 import json
 from decimal import Decimal
 from unittest.mock import patch
@@ -35,7 +36,6 @@ class ProductModelTests(TestCase):
         self.assertEqual(product.stock, 0)
 
     def test_product_get_absolute_url(self):
-        # Assumes the URL name is product_detail.
         self.assertEqual(
             self.product.get_absolute_url(),
             reverse("product_detail", args=[self.product.pk]),
@@ -123,7 +123,10 @@ class PaymentModelTests(TestCase):
         self.assertEqual(payment.method, "mpesa")
         self.assertEqual(payment.status, "pending")
         self.assertEqual(payment.amount, Decimal("5000.00"))
-        self.assertEqual(str(payment), f"Payment for Order #{self.order.pk} - pending")
+        self.assertEqual(
+            str(payment),
+            f"Payment for Order #{self.order.pk} - pending",
+        )
 
     def test_payment_has_one_order(self):
         Payment.objects.create(
@@ -151,7 +154,6 @@ class StoreViewTests(TestCase):
         )
 
     def test_product_list_page(self):
-        # Assumes the URL name is product_list.
         response = self.client.get(reverse("product_list"))
 
         self.assertEqual(response.status_code, 200)
@@ -173,17 +175,22 @@ class StoreViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_cart_add_increases_quantity(self):
-        response = self.client.get(
+        # cart_add requires POST, not GET.
+        response = self.client.post(
             reverse("cart_add", args=[self.product.pk])
         )
 
         self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse("cart_view"))
         self.assertEqual(
             self.client.session["cart"][str(self.product.pk)], 1
         )
 
-        self.client.get(reverse("cart_add", args=[self.product.pk]))
+        response = self.client.post(
+            reverse("cart_add", args=[self.product.pk])
+        )
 
+        self.assertEqual(response.status_code, 302)
         self.assertEqual(
             self.client.session["cart"][str(self.product.pk)], 2
         )
@@ -196,12 +203,19 @@ class StoreViewTests(TestCase):
         response = self.client.get(reverse("cart_view"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["total"], Decimal("24000.00"))
+        self.assertEqual(
+            response.context["total"],
+            Decimal("24000.00"),
+        )
 
     def test_empty_checkout_page(self):
+        # An empty cart should redirect to the product catalogue.
         response = self.client.get(reverse("checkout"))
 
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(
+            response,
+            reverse("product_list"),
+        )
 
 
 class CheckoutTests(TestCase):
@@ -254,12 +268,11 @@ class CheckoutTests(TestCase):
         self.assertEqual(payment.amount, Decimal("4000.00"))
         self.assertEqual(payment.mpesa_phone, "254712345678")
         self.assertEqual(
-            payment.transaction_id, "TEST-CHECKOUT-123"
+            payment.transaction_id,
+            "TEST-CHECKOUT-123",
         )
 
-        self.assertEqual(
-            self.client.session["cart"], {}
-        )
+        self.assertEqual(self.client.session["cart"], {})
         mock_stk_push.assert_called_once()
         mock_send_mail.assert_called_once()
 
