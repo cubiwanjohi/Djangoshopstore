@@ -101,7 +101,9 @@ class OrderModelTests(TestCase):
 
         self.order.delete()
 
-        self.assertFalse(OrderItem.objects.filter(pk=item_id).exists())
+        self.assertFalse(
+            OrderItem.objects.filter(pk=item_id).exists()
+        )
 
 
 class PaymentModelTests(TestCase):
@@ -175,25 +177,24 @@ class StoreViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_cart_add_increases_quantity(self):
-        # cart_add requires POST, not GET.
-        response = self.client.post(
-            reverse("cart_add", args=[self.product.pk])
-        )
+        url = reverse("cart_add", args=[self.product.pk])
+
+        # The cart_add view requires POST requests.
+        response = self.client.post(url)
 
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse("cart_view"))
-        self.assertEqual(
-            self.client.session["cart"][str(self.product.pk)], 1
-        )
 
-        response = self.client.post(
-            reverse("cart_add", args=[self.product.pk])
-        )
+        cart = self.client.session.get("cart", {})
+        self.assertEqual(cart[str(self.product.pk)], 1)
+
+        # Adding the same product again increases its quantity.
+        response = self.client.post(url)
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            self.client.session["cart"][str(self.product.pk)], 2
-        )
+
+        cart = self.client.session.get("cart", {})
+        self.assertEqual(cart[str(self.product.pk)], 2)
 
     def test_cart_view_calculates_total(self):
         session = self.client.session
@@ -207,15 +208,16 @@ class StoreViewTests(TestCase):
             response.context["total"],
             Decimal("24000.00"),
         )
-    
-def test_empty_checkout_page(self):
-    response = self.client.get(reverse("checkout"))
 
-    self.assertEqual(response.status_code, 302)
-    self.assertRedirects(
-        response,
-        reverse("product_list"),
-    )
+    def test_empty_checkout_page(self):
+        # An empty cart redirects to the product catalogue.
+        response = self.client.get(reverse("checkout"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            reverse("product_list"),
+        )
 
 
 class CheckoutTests(TestCase):
@@ -285,6 +287,7 @@ class MpesaCallbackTests(TestCase):
             customer_name="Peter",
             customer_email="peter@example.com",
         )
+
         self.payment = Payment.objects.create(
             order=self.order,
             amount=Decimal("3000.00"),
