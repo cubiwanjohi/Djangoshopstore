@@ -1,0 +1,57 @@
+
+name: Django Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: shopstore
+          POSTGRES_USER: shopstore_user
+          POSTGRES_PASSWORD: shopstore_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U shopstore_user -d shopstore"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SECRET_KEY: ci-test-secret-key-not-for-production
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      USE_SQLITE: "False"
+      POSTGRES_DB: shopstore
+      POSTGRES_USER: shopstore_user
+      POSTGRES_PASSWORD: shopstore_password
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Django tests
+        run: python manage.py test --verbosity 2
