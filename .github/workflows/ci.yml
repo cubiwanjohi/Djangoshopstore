@@ -17,8 +17,8 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Third-party actions are pinned to full commit SHAs (the version is in the comment),
-# because version tags can be moved. Dependabot keeps these pins up to date.
+# Third-party actions are pinned to full commit SHAs.
+# Dependabot keeps these pins up to date.
 
 jobs:
   test:
@@ -135,8 +135,7 @@ jobs:
       - name: Build the image
         run: docker build -t shopstore-web:ci .
 
-      # Pinned to the commit of trivy-action v0.35.0 and Trivy v0.69.3. In March 2026
-      # older trivy-action tags were hijacked, so never reference this action by tag.
+      # Trivy reports HIGH and CRITICAL vulnerabilities without failing this step.
       - name: Report HIGH and CRITICAL image vulnerabilities
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
@@ -160,16 +159,65 @@ jobs:
       - name: Start the stack
         run: docker compose up -d --build
 
+      - name: Wait for the web container to remain running
+        run: |
+          for i in {1..30}; do
+            STATUS=$(docker inspect --format='{{.State.Status}}' shopstore-web-1 2>/dev/null || true)
+
+            if [ "$STATUS" = "running" ]; then
+              echo "Web container is running."
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              echo "Web container did not start."
+              docker compose ps
+              docker compose logs --no-color web
+              exit 1
+            fi
+
+            sleep 2
+          done
+
       - name: Smoke test the running app
         run: |
-          curl --fail --silent --show-error --retry 30 --retry-delay 2 --retry-connrefused \
-            http://localhost:8000/ > /dev/null
-          curl --fail --silent --show-error http://localhost:8000/static/store/style.css > /dev/null
-          echo "App and static files respond correctly"
+          set -e
+
+          echo "Checking the Django homepage..."
+
+          for i in {1..30}; do
+            if curl --connect-timeout 5 --max-time 15 \
+              --fail --silent --show-error \
+              --retry 2 --retry-delay 2 --retry-all-errors \
+              http://localhost:8000/ -o /dev/null; then
+              echo "Django homepage responded successfully."
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              echo "Django homepage failed after 30 attempts."
+              exit 1
+            fi
+
+            echo "Attempt $i failed. Waiting 2 seconds..."
+            sleep 2
+          done
+
+          echo "Checking the CSS file..."
+
+          curl --connect-timeout 5 --max-time 15 \
+            --fail --silent --show-error \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            http://localhost:8000/static/store/style.css \
+            -o /dev/null
+
+          echo "App and static files responded correctly."
 
       - name: Show container logs on failure
         if: failure()
-        run: docker compose logs --no-color
+        run: |
+          docker compose ps
+          docker compose logs --no-color web db
 
       - name: Stop the stack
         if: always()
