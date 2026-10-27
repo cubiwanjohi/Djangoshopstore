@@ -1,4 +1,3 @@
-```yaml
 name: CI
 
 on:
@@ -7,7 +6,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    # Weekly scan for newly published vulnerabilities.
+    # Weekly run, so newly published vulnerabilities in dependencies show up.
     - cron: "0 6 * * 1"
   workflow_dispatch:
 
@@ -17,6 +16,9 @@ permissions:
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+# Third-party actions are pinned to full commit SHAs (the version is in the comment),
+# because version tags can be moved. Dependabot keeps these pins up to date.
 
 jobs:
   test:
@@ -133,7 +135,8 @@ jobs:
       - name: Build the image
         run: docker build -t shopstore-web:ci .
 
-      # Report vulnerabilities without failing the reporting step.
+      # Pinned to the commit of trivy-action v0.35.0 and Trivy v0.69.3. In March 2026
+      # older trivy-action tags were hijacked, so never reference this action by tag.
       - name: Report HIGH and CRITICAL image vulnerabilities
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
@@ -144,7 +147,6 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
 
-      # Fail this step if fixable or unfixed CRITICAL vulnerabilities are found.
       - name: Fail on CRITICAL image vulnerabilities
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
@@ -158,134 +160,28 @@ jobs:
       - name: Start the stack
         run: docker compose up -d --build
 
-      - name: Wait for the web container to remain running
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          for i in {1..30}; do
-            WEB_ID="$(docker compose ps -q web)"
-
-            if [ -n "$WEB_ID" ]; then
-              STATUS="$(docker inspect --format='{{.State.Status}}' "$WEB_ID")"
-              RUNNING="$(docker inspect --format='{{.State.Running}}' "$WEB_ID")"
-
-              if [ "$STATUS" = "running" ] && [ "$RUNNING" = "true" ]; then
-                echo "Web container is running."
-                break
-              fi
-
-              if [ "$STATUS" = "exited" ] || [ "$STATUS" = "dead" ]; then
-                echo "Web container stopped unexpectedly."
-                docker compose ps -a
-                docker compose logs --no-color --timestamps web
-                exit 1
-              fi
-            fi
-
-            if [ "$i" -eq 30 ]; then
-              echo "Web container did not start within 60 seconds."
-              docker compose ps -a
-              docker compose logs --no-color --timestamps web db
-              exit 1
-            fi
-
-            sleep 2
-          done
-
+      # `docker compose up -d` returns once the containers have started, not once the app
+      # inside is ready (it still runs migrations and collectstatic first), so wait for it.
       - name: Smoke test the running app
-        shell: bash
         run: |
-          set -uo pipefail
-
-          BASE_URL="http://localhost:8000"
-          HOMEPAGE_OK=false
-
-          echo "Checking the Django homepage..."
-
-          for i in {1..30}; do
-            HTTP_CODE="$(curl \
-              --connect-timeout 5 \
-              --max-time 15 \
-              --silent \
-              --output /dev/null \
-              --write-out '%{http_code}' \
-              "$BASE_URL/" 2>/dev/null || true)"
-
-            if [[ "$HTTP_CODE" =~ ^2[0-9][0-9]$ ]] || \
-               [[ "$HTTP_CODE" =~ ^3[0-9][0-9]$ ]]; then
-              echo "Homepage responded with HTTP $HTTP_CODE."
-              HOMEPAGE_OK=true
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --max-time 5 http://localhost:8000/ > /dev/null; then
+              echo "App is ready (attempt ${attempt})"
               break
             fi
-
-            echo "Homepage attempt $i returned HTTP '${HTTP_CODE:-no response}'."
-
-            if [ "$i" -lt 30 ]; then
-              sleep 2
+            if [ "${attempt}" -eq 30 ]; then
+              echo "The app did not become ready within about 60 seconds"
+              exit 1
             fi
+            sleep 2
           done
-
-          if [ "$HOMEPAGE_OK" != "true" ]; then
-            echo "Homepage failed after 30 attempts."
-            docker compose ps -a
-            docker compose logs --no-color --timestamps web db
-            exit 1
-          fi
-
-          echo "Checking the CSS file..."
-
-          CSS_CODE="$(curl \
-            --connect-timeout 5 \
-            --max-time 15 \
-            --silent \
-            --output /dev/null \
-            --write-out '%{http_code}' \
-            "$BASE_URL/static/store/style.css" 2>/dev/null || true)"
-
-          if [ "$CSS_CODE" != "200" ]; then
-            echo "CSS check failed with HTTP '${CSS_CODE:-no response}'."
-            docker compose ps -a
-            docker compose logs --no-color --timestamps web
-            exit 1
-          fi
-
-          echo "CSS file responded with HTTP 200."
-          echo "App and static-file smoke tests passed."
+          curl --fail --silent --show-error --max-time 10 http://localhost:8000/static/store/style.css > /dev/null
+          echo "App and static files respond correctly"
 
       - name: Show container logs on failure
         if: failure()
-        run: |
-          echo "========================================"
-          echo "CONTAINER STATUS"
-          echo "========================================"
-          docker compose ps -a
-
-          echo ""
-          echo "========================================"
-          echo "DJANGO WEB CONTAINER LOGS"
-          echo "========================================"
-          docker compose logs --no-color --timestamps web
-
-          echo ""
-          echo "========================================"
-          echo "POSTGRES DATABASE LOGS"
-          echo "========================================"
-          docker compose logs --no-color --timestamps db
-
-          echo ""
-          echo "========================================"
-          echo "WEB CONTAINER STATE"
-          echo "========================================"
-          WEB_ID="$(docker compose ps -aq web)"
-          if [ -n "$WEB_ID" ]; then
-            docker inspect "$WEB_ID" \
-              --format='Status={{.State.Status}} ExitCode={{.State.ExitCode}} OOMKilled={{.State.OOMKilled}} Error={{.State.Error}}'
-          else
-            echo "No web container found."
-          fi
+        run: docker compose logs --no-color
 
       - name: Stop the stack
         if: always()
-        run: docker compose down
-```
+        run: docker compose down -v
