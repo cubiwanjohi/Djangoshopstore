@@ -138,7 +138,7 @@ jobs:
       # Pinned to the commit of trivy-action v0.35.0 and Trivy v0.69.3. In March 2026
       # older trivy-action tags were hijacked, so never reference this action by tag.
       - name: Report HIGH and CRITICAL image vulnerabilities
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: shopstore-web:ci
           version: v0.69.3
@@ -148,7 +148,7 @@ jobs:
           exit-code: "0"
 
       - name: Fail on CRITICAL image vulnerabilities
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: shopstore-web:ci
           version: v0.69.3
