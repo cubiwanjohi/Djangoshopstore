@@ -1,0 +1,21 @@
+version: 2
+
+updates:
+  # Keeps the SHA-pinned actions in .github/workflows up to date.
+  # Review every update to a third-party action (for example trivy-action) before merging.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Python dependencies in requirements.txt.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+
+  # The python:3.13-slim base image in the Dockerfile.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
