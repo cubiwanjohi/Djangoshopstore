@@ -1,6 +1,5 @@
 """Storefront views: catalogue, cart, checkout and the M-Pesa callback."""
 
-import json
 import logging
 import re
 
@@ -9,13 +8,11 @@ from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import F
-from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .models import Order, OrderItem, Payment, Product
-from .mpesa import stk_push
+from payments.services.mpesa import stk_push
 
 logger = logging.getLogger(__name__)
 
@@ -255,53 +252,3 @@ def checkout(request):
 # --------------------------------------------------------------------------
 # M-Pesa callback
 # --------------------------------------------------------------------------
-
-@csrf_exempt
-@require_POST
-def mpesa_callback(request):
-    try:
-        callback = json.loads(request.body)['Body']['stkCallback']
-        checkout_request_id = callback['CheckoutRequestID']
-        result_code = int(callback['ResultCode'])
-    except (ValueError, KeyError, TypeError):
-        logger.warning('Malformed M-Pesa callback received')
-        return JsonResponse({'ResultCode': 1, 'ResultDesc': 'Invalid payload'}, status=400)
-
-    paid_order = None
-
-    with transaction.atomic():
-        payment = (
-            Payment.objects.select_for_update()
-            .filter(transaction_id=checkout_request_id)
-            .first()
-        )
-
-        if payment is None:
-            logger.warning('M-Pesa callback for unknown CheckoutRequestID')
-        elif payment.status != 'pending':
-            logger.info('Ignoring repeated callback for payment %s', payment.pk)
-        elif result_code == 0:
-            payment.status = 'completed'
-            payment.save(update_fields=['status'])
-            payment.order.status = 'paid'
-            payment.order.save(update_fields=['status'])
-            paid_order = payment.order
-        else:
-            payment.status = 'failed'
-            payment.save(update_fields=['status'])
-            _restore_stock(payment.order)
-
-    if paid_order is not None:
-        _send_email(
-            subject=f'Payment received for order #{paid_order.id}',
-            message=(
-                f'Hi {paid_order.customer_name},\n\n'
-                f'We have received your M-Pesa payment of KSh {paid_order.total()} '
-                f'for order #{paid_order.id}.\n'
-                f'Delivery to: {paid_order.shipping_address}, {paid_order.shipping_city}\n\n'
-                f"We'll notify you when it ships."
-            ),
-            recipient=paid_order.customer_email,
-        )
-
-    return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Accepted'})
