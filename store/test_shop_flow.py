@@ -505,7 +505,7 @@ class MpesaCallbackTests(TestCase):
     # --- unexpected input ---
 
     def test_unknown_request_id_changes_nothing(self):
-        with self.assertLogs('store.views', level='WARNING'):
+        with self.assertLogs('payments.views', level='WARNING'):
             response = self.post_json(callback_payload(checkout_request_id='ws_CO_UNKNOWN'))
 
         self.assertEqual(response.status_code, 200)
@@ -527,7 +527,7 @@ class MpesaCallbackTests(TestCase):
         }
         for label, body in bad_payloads.items():
             with self.subTest(payload=label):
-                with self.assertLogs('store.views', level='WARNING'):
+                with self.assertLogs('payments.views', level='WARNING'):
                     response = self.client.post(
                         self.url, data=body, content_type='application/json'
                     )
