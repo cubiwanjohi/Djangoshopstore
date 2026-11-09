@@ -302,3 +302,8 @@ EMAIL_BACKEND = (
 # ============================================================
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Customer authentication URLs
+LOGIN_URL = "customers:customer_login"
+LOGIN_REDIRECT_URL = "customers:customer_dashboard"
+LOGOUT_REDIRECT_URL = "customers:customer_login"

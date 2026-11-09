@@ -4,9 +4,16 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('store.urls')),
-    path('', include('payments.urls')),
+    path("admin/", admin.site.urls),
+
+    # Customer functionality
+    path("customers/", include("customers.urls")),
+
+    # Store functionality
+    path("", include("store.urls")),
+
+    # M-Pesa payments
+    path("", include("payments.urls")),
 ]
 
 if settings.DEBUG:

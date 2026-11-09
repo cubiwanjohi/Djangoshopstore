@@ -1,0 +1,58 @@
+```html
+{% extends "store/base.html" %}
+
+{% block title %}My Account | ShopStore{% endblock %}
+
+{% block content %}
+
+<section class="auth-container">
+    <div class="auth-card">
+
+        <h1>My Account</h1>
+
+        <p>
+            Welcome,
+            {% if request.user.first_name %}
+                {{ request.user.first_name }}
+            {% else %}
+                {{ request.user.username }}
+            {% endif %}!
+        </p>
+
+        <h3>Account Information</h3>
+
+        <p>Username: {{ request.user.username }}</p>
+        <p>Email: {{ request.user.email }}</p>
+        <p>Phone: {{ profile.phone_number|default:"Not provided" }}</p>
+
+        <h3>My Delivery Addresses</h3>
+
+        {% for address in addresses %}
+            <div class="address-item">
+                <strong>{{ address.label }}</strong>
+                <p>{{ address.recipient_name }}</p>
+                <p>{{ address.phone_number }}</p>
+                <p>{{ address.address_line }}</p>
+                <p>{{ address.city }}, {{ address.county }}</p>
+
+                {% if address.is_default %}
+                    <strong>Default delivery address</strong>
+                {% endif %}
+            </div>
+        {% empty %}
+            <p>You have not added any delivery addresses yet.</p>
+        {% endfor %}
+
+        <form method="POST" action="{% url 'customers:customer_logout' %}">
+            {% csrf_token %}
+
+            <button type="submit" class="btn btn-primary">
+                Logout
+            </button>
+        </form>
+
+    </div>
+</section>
+
+{% endblock %}
+```
