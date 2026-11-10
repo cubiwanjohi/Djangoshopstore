@@ -1,3 +1,4 @@
+
 from django.urls import path, reverse_lazy
 from django.contrib.auth import views as auth_views
 
@@ -42,5 +43,19 @@ urlpatterns = [
         "dashboard/",
         views.customer_dashboard,
         name="customer_dashboard",
+    ),
+
+    # Customer order history
+    path(
+        "orders/",
+        views.customer_order_history,
+        name="customer_orders",
+    ),
+
+    # Individual order details
+    path(
+        "orders/<int:pk>/",
+        views.customer_order_detail,
+        name="customer_order_detail",
     ),
 ]

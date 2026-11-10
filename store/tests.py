@@ -1,11 +1,15 @@
+
 import json
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
 from .models import Product, Order, OrderItem, Payment
+
+User = get_user_model()
 
 
 class ProductModelTests(TestCase):
@@ -35,7 +39,6 @@ class ProductModelTests(TestCase):
         self.assertEqual(product.stock, 0)
 
     def test_product_get_absolute_url(self):
-        # Assumes the URL name is product_detail.
         self.assertEqual(
             self.product.get_absolute_url(),
             reverse("product_detail", args=[self.product.pk]),
@@ -123,7 +126,10 @@ class PaymentModelTests(TestCase):
         self.assertEqual(payment.method, "mpesa")
         self.assertEqual(payment.status, "pending")
         self.assertEqual(payment.amount, Decimal("5000.00"))
-        self.assertEqual(str(payment), f"Payment for Order #{self.order.pk} - pending")
+        self.assertEqual(
+            str(payment),
+            f"Payment for Order #{self.order.pk} - pending",
+        )
 
     def test_payment_has_one_order(self):
         Payment.objects.create(
@@ -151,7 +157,6 @@ class StoreViewTests(TestCase):
         )
 
     def test_product_list_page(self):
-        # Assumes the URL name is product_list.
         response = self.client.get(reverse("product_list"))
 
         self.assertEqual(response.status_code, 200)
@@ -173,7 +178,6 @@ class StoreViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_cart_add_increases_quantity(self):
-        # Adding to the cart changes state, so the view only accepts POST.
         response = self.client.post(
             reverse("cart_add", args=[self.product.pk])
         )
@@ -222,7 +226,7 @@ class StoreViewTests(TestCase):
 
 
 class CheckoutTests(TestCase):
-    """Test checkout without contacting the real M-Pesa service."""
+    """Test guest and authenticated checkout without contacting real M-Pesa."""
 
     def setUp(self):
         self.product = Product.objects.create(
@@ -240,6 +244,8 @@ class CheckoutTests(TestCase):
     def test_checkout_creates_order_and_payment(
         self, mock_stk_push, mock_send_mail
     ):
+        """Guest checkout should create an order without a user."""
+
         mock_stk_push.return_value = {
             "CheckoutRequestID": "TEST-CHECKOUT-123",
             "ResponseCode": "0",
@@ -266,17 +272,69 @@ class CheckoutTests(TestCase):
         order = Order.objects.get()
         payment = Payment.objects.get()
 
+        self.assertIsNone(order.user)
         self.assertEqual(order.customer_name, "Peter")
         self.assertEqual(order.total(), Decimal("4000.00"))
+
         self.assertEqual(payment.amount, Decimal("4000.00"))
         self.assertEqual(payment.mpesa_phone, "254712345678")
         self.assertEqual(
             payment.transaction_id, "TEST-CHECKOUT-123"
         )
 
-        self.assertEqual(
-            self.client.session["cart"], {}
+        self.assertEqual(self.client.session["cart"], {})
+
+        mock_stk_push.assert_called_once()
+        mock_send_mail.assert_called_once()
+
+    @patch("store.views.send_mail")
+    @patch("store.views.stk_push")
+    def test_authenticated_checkout_links_order_to_customer(
+        self, mock_stk_push, mock_send_mail
+    ):
+        """Authenticated checkout should associate the order with the user."""
+
+        mock_stk_push.return_value = {
+            "CheckoutRequestID": "TEST-AUTH-CHECKOUT-123",
+            "ResponseCode": "0",
+            "ResponseDescription": "Success",
+        }
+
+        customer = User.objects.create_user(
+            username="checkoutcustomer",
+            email="checkout@example.com",
+            password="StrongPass123!",
         )
+
+        self.client.force_login(customer)
+
+        response = self.client.post(
+            reverse("checkout"),
+            {
+                "name": "Peter",
+                "email": "checkout@example.com",
+                "address": "Kerugoya Road",
+                "city": "Kerugoya",
+                "phone": "0712345678",
+                "mpesa_phone": "0712345678",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Order.objects.count(), 1)
+
+        order = Order.objects.get()
+
+        self.assertEqual(order.user, customer)
+        self.assertEqual(order.customer_name, "Peter")
+        self.assertEqual(
+            order.customer_email,
+            "checkout@example.com",
+        )
+        self.assertEqual(order.total(), Decimal("4000.00"))
+
+        self.assertEqual(self.client.session["cart"], {})
+
         mock_stk_push.assert_called_once()
         mock_send_mail.assert_called_once()
 

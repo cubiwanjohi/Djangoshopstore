@@ -1,3 +1,4 @@
+
 """Storefront views: catalogue, cart, checkout and the M-Pesa callback."""
 
 import logging
@@ -42,8 +43,10 @@ def _normalize_phone(raw):
         national = digits
     else:
         return None
+
     if national[0] not in '17':
         return None
+
     return '254' + national
 
 
@@ -58,9 +61,15 @@ def _cart_lines(request):
         product = products.get(int(pk)) if str(pk).isdigit() else None
         if product is None:
             continue
+
         subtotal = product.price * qty
         total += subtotal
-        lines.append({'product': product, 'quantity': qty, 'subtotal': subtotal})
+        lines.append({
+            'product': product,
+            'quantity': qty,
+            'subtotal': subtotal,
+        })
+
     return lines, total
 
 
@@ -113,7 +122,10 @@ def cart_add(request, pk):
 
 def cart_view(request):
     items, total = _cart_lines(request)
-    return render(request, 'store/cart.html', {'items': items, 'total': total})
+    return render(request, 'store/cart.html', {
+        'items': items,
+        'total': total,
+    })
 
 
 # --------------------------------------------------------------------------
@@ -122,10 +134,15 @@ def cart_view(request):
 
 def checkout(request):
     lines, total = _cart_lines(request)
+
     if not lines:
         return redirect('product_list')
 
-    context = {'items': lines, 'total': total, 'form': request.POST}
+    context = {
+        'items': lines,
+        'total': total,
+        'form': request.POST,
+    }
 
     if request.method != 'POST':
         return render(request, 'store/checkout.html', context)
@@ -138,9 +155,15 @@ def checkout(request):
     mpesa_phone = _normalize_phone(request.POST.get('mpesa_phone'))
 
     error = None
+
     if not all([name, email, address, city, phone]):
         error = 'Please fill in all the fields.'
-    elif len(name) > 200 or len(address) > 255 or len(city) > 100 or len(phone) > 20:
+    elif (
+        len(name) > 200
+        or len(address) > 255
+        or len(city) > 100
+        or len(phone) > 20
+    ):
         error = 'One of the fields is too long.'
     elif mpesa_phone is None:
         error = 'Enter a valid Safaricom number, for example 0712345678.'
@@ -151,18 +174,28 @@ def checkout(request):
             error = 'Enter a valid email address.'
 
     if error:
-        return render(request, 'store/checkout.html', {**context, 'error': error})
+        return render(
+            request,
+            'store/checkout.html',
+            {**context, 'error': error},
+        )
 
     # Create the order, reserve stock and record the pending payment atomically.
     try:
         with transaction.atomic():
             product_ids = [line['product'].pk for line in lines]
+
             locked = {
                 p.pk: p
-                for p in Product.objects.select_for_update().filter(pk__in=product_ids)
+                for p in Product.objects.select_for_update().filter(
+                    pk__in=product_ids
+                )
             }
 
+            # Associate the order with the logged-in customer.
+            # Guest orders will have user=None.
             order = Order.objects.create(
+                user=request.user if request.user.is_authenticated else None,
                 customer_name=name,
                 customer_email=email,
                 shipping_address=address,
@@ -173,6 +206,7 @@ def checkout(request):
             for line in lines:
                 product = locked.get(line['product'].pk)
                 qty = line['quantity']
+
                 if product is None or product.stock < qty:
                     raise OutOfStock(line['product'].name)
 
@@ -182,7 +216,10 @@ def checkout(request):
                     quantity=qty,
                     price=product.price,
                 )
-                Product.objects.filter(pk=product.pk).update(stock=F('stock') - qty)
+
+                Product.objects.filter(pk=product.pk).update(
+                    stock=F('stock') - qty
+                )
 
             payment = Payment.objects.create(
                 order=order,
@@ -190,17 +227,25 @@ def checkout(request):
                 amount=order.total(),
                 mpesa_phone=mpesa_phone,
             )
+
     except OutOfStock as exc:
         return render(
             request,
             'store/checkout.html',
-            {**context, 'error': f'Sorry, "{exc.product_name}" does not have enough stock.'},
+            {
+                **context,
+                'error': (
+                    f'Sorry, "{exc.product_name}" '
+                    'does not have enough stock.'
+                ),
+            },
         )
 
-    # Ask Safaricom to prompt the customer. This is a network call, so it runs
+    # Ask Safaricom to prompt the customer. This network call runs
     # outside the database transaction.
     prompt_sent = False
     checkout_request_id = ''
+
     try:
         stk_response = stk_push(
             phone_number=mpesa_phone,
@@ -208,16 +253,28 @@ def checkout(request):
             account_reference=f'Order{order.id}',
             transaction_desc=f'Payment for Order #{order.id}',
         )
+
         checkout_request_id = stk_response.get('CheckoutRequestID', '')
-        prompt_sent = str(stk_response.get('ResponseCode')) == '0' and bool(checkout_request_id)
+
+        prompt_sent = (
+            str(stk_response.get('ResponseCode')) == '0'
+            and bool(checkout_request_id)
+        )
+
         if not prompt_sent:
-            logger.warning('STK push rejected for order %s: %s', order.id, stk_response)
+            logger.warning(
+                'STK push rejected for order %s: %s',
+                order.id,
+                stk_response,
+            )
+
     except Exception:
         logger.exception('STK push failed for order %s', order.id)
 
     if prompt_sent:
         payment.transaction_id = checkout_request_id
         payment.save(update_fields=['transaction_id'])
+
     else:
         with transaction.atomic():
             payment.status = 'failed'
@@ -227,16 +284,23 @@ def checkout(request):
     request.session['cart'] = {}
 
     if prompt_sent:
-        payment_line = 'Enter your M-Pesa PIN on your phone to complete the payment.'
+        payment_line = (
+            'Enter your M-Pesa PIN on your phone to complete the payment.'
+        )
     else:
-        payment_line = 'We could not start the M-Pesa payment. Please contact us about this order.'
+        payment_line = (
+            'We could not start the M-Pesa payment. '
+            'Please contact us about this order.'
+        )
 
     _send_email(
         subject=f'Order #{order.id} received',
         message=(
             f'Hi {order.customer_name},\n\n'
-            f'Thanks for your order! Order #{order.id} total: KSh {order.total()}\n'
-            f'Delivery to: {order.shipping_address}, {order.shipping_city}\n\n'
+            f'Thanks for your order! Order #{order.id} '
+            f'total: KSh {order.total()}\n'
+            f'Delivery to: {order.shipping_address}, '
+            f'{order.shipping_city}\n\n'
             f'{payment_line}'
         ),
         recipient=order.customer_email,
@@ -245,7 +309,11 @@ def checkout(request):
     return render(
         request,
         'store/order_success.html',
-        {'order': order, 'payment': payment, 'payment_prompt_sent': prompt_sent},
+        {
+            'order': order,
+            'payment': payment,
+            'payment_prompt_sent': prompt_sent,
+        },
     )
 
 

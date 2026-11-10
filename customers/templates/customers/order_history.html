@@ -1,0 +1,78 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}My Orders | ShopStore{% endblock %}
+
+{% block content %}
+
+<section class="auth-container">
+    <div class="auth-card">
+
+        <h1>My Orders</h1>
+
+        <p>View your purchases and track their delivery progress.</p>
+
+        <p>
+            <a href="{% url 'customers:customer_dashboard' %}">
+                Back to My Account
+            </a>
+        </p>
+
+        {% for order in orders %}
+
+            <div class="order-item">
+
+                <h3>Order #{{ order.id }}</h3>
+
+                <p>
+                    Date:
+                    {{ order.created_at|date:"d M Y, H:i" }}
+                </p>
+
+                <p>
+                    Total:
+                    KSh {{ order.total|floatformat:2 }}
+                </p>
+
+                <p>
+                    Order status:
+                    {{ order.get_status_display }}
+                </p>
+
+                <p>
+                    Delivery:
+                    {{ order.get_delivery_status_display }}
+                </p>
+
+                {% if order.payment %}
+                    <p>
+                        Payment:
+                        {{ order.payment.get_status_display }}
+                    </p>
+                {% else %}
+                    <p>Payment: Not available</p>
+                {% endif %}
+
+                <a href="{% url 'customers:customer_order_detail' order.pk %}"
+                   class="btn btn-primary">
+                    View Order Details
+                </a>
+
+            </div>
+
+            <hr>
+
+        {% empty %}
+
+            <p>You haven't placed any orders yet.</p>
+
+            <a href="{% url 'product_list' %}" class="btn btn-primary">
+                Start Shopping
+            </a>
+
+        {% endfor %}
+
+    </div>
+</section>
+
+{% endblock %}
