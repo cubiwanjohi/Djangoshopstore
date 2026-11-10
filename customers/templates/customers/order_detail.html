@@ -1,0 +1,118 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}Order #{{ order.id }} | ShopStore{% endblock %}
+
+{% block content %}
+
+<section class="auth-container">
+    <div class="auth-card">
+
+        <h1>Order #{{ order.id }}</h1>
+
+        <p>
+            Placed on:
+            {{ order.created_at|date:"d M Y, H:i" }}
+        </p>
+
+        <hr>
+
+        <h3>Order Information</h3>
+
+        <p>Order status: {{ order.get_status_display }}</p>
+
+        <p>
+            Delivery status:
+            {{ order.get_delivery_status_display }}
+        </p>
+
+        <h3>Purchased Products</h3>
+
+        {% for item in order.items.all %}
+
+            <div class="order-product">
+
+                <h4>{{ item.product.name }}</h4>
+
+                <p>Quantity: {{ item.quantity }}</p>
+
+                <p>
+                    Unit price:
+                    KSh {{ item.price|floatformat:2 }}
+                </p>
+
+                <p>
+                    Subtotal:
+                    KSh {{ item.subtotal|floatformat:2 }}
+                </p>
+
+            </div>
+
+            <hr>
+
+        {% empty %}
+
+            <p>No products found for this order.</p>
+
+        {% endfor %}
+
+        <h3>Order Total</h3>
+
+        <p>
+            <strong>KSh {{ order.total|floatformat:2 }}</strong>
+        </p>
+
+        <hr>
+
+        <h3>Payment Information</h3>
+
+        {% if order.payment %}
+
+            <p>Method: {{ order.payment.get_method_display }}</p>
+
+            <p>
+                Payment status:
+                {{ order.payment.get_status_display }}
+            </p>
+
+            <p>
+                Amount:
+                KSh {{ order.payment.amount|floatformat:2 }}
+            </p>
+
+            <p>
+                M-Pesa phone:
+                {{ order.payment.mpesa_phone }}
+            </p>
+
+            {% if order.payment.transaction_id %}
+                <p>
+                    Transaction reference:
+                    {{ order.payment.transaction_id }}
+                </p>
+            {% endif %}
+
+        {% else %}
+
+            <p>No payment information is available.</p>
+
+        {% endif %}
+
+        <hr>
+
+        <h3>Delivery Information</h3>
+
+        <p>Recipient: {{ order.customer_name }}</p>
+        <p>Phone: {{ order.shipping_phone }}</p>
+        <p>Address: {{ order.shipping_address }}</p>
+        <p>City: {{ order.shipping_city }}</p>
+
+        <a href="{% url 'customers:customer_orders' %}"
+           class="btn btn-primary">
+            Back to My Orders
+        </a>
+
+    </div>
+</section>
+
+{% endblock %}

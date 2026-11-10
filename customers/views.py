@@ -1,10 +1,12 @@
+
 from django.contrib import messages
 from django.db import transaction
-from django.shortcuts import render, redirect
-
 from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+
 from .forms import CustomerRegistrationForm
 from .models import CustomerProfile
+from store.models import Order
 
 
 def register(request):
@@ -19,10 +21,7 @@ def register(request):
             # Create the user and profile together.
             with transaction.atomic():
                 user = form.save()
-
-                CustomerProfile.objects.create(
-                    user=user
-                )
+                CustomerProfile.objects.create(user=user)
 
             messages.success(
                 request,
@@ -40,6 +39,7 @@ def register(request):
         {"form": form},
     )
 
+
 @login_required
 def customer_dashboard(request):
     profile, created = CustomerProfile.objects.get_or_create(
@@ -55,4 +55,42 @@ def customer_dashboard(request):
             "profile": profile,
             "addresses": addresses,
         },
+    )
+
+
+@login_required
+def customer_order_history(request):
+    """Display orders belonging to the logged-in customer."""
+
+    orders = (
+        Order.objects
+        .filter(user=request.user)
+        .select_related("payment")
+        .prefetch_related("items__product")
+        .order_by("-created_at")
+    )
+
+    return render(
+        request,
+        "customers/order_history.html",
+        {"orders": orders},
+    )
+
+
+@login_required
+def customer_order_detail(request, pk):
+    """Display an order only if it belongs to the logged-in customer."""
+
+    order = get_object_or_404(
+        Order.objects
+        .filter(user=request.user)
+        .select_related("payment")
+        .prefetch_related("items__product"),
+        pk=pk,
+    )
+
+    return render(
+        request,
+        "customers/order_detail.html",
+        {"order": order},
     )

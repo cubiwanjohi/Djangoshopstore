@@ -1,4 +1,4 @@
-```html
+
 {% extends "store/base.html" %}
 
 {% block title %}My Account | ShopStore{% endblock %}
@@ -25,6 +25,19 @@
         <p>Email: {{ request.user.email }}</p>
         <p>Phone: {{ profile.phone_number|default:"Not provided" }}</p>
 
+        <hr>
+
+        <h3>My Orders</h3>
+
+        <p>View your previous purchases and track deliveries.</p>
+
+        <a href="{% url 'customers:customer_orders' %}"
+           class="btn btn-primary">
+            View My Orders
+        </a>
+
+        <hr>
+
         <h3>My Delivery Addresses</h3>
 
         {% for address in addresses %}
@@ -43,6 +56,8 @@
             <p>You have not added any delivery addresses yet.</p>
         {% endfor %}
 
+        <hr>
+
         <form method="POST" action="{% url 'customers:customer_logout' %}">
             {% csrf_token %}
 
@@ -55,4 +70,3 @@
 </section>
 
 {% endblock %}
-```
