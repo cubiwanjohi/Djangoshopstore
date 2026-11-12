@@ -1,4 +1,3 @@
-
 """Storefront views: catalogue, cart, checkout and the M-Pesa callback."""
 
 import logging
@@ -14,6 +13,9 @@ from django.views.decorators.http import require_POST
 
 from .models import Order, OrderItem, Payment, Product
 from payments.services.mpesa import stk_push
+
+from inventory.models import StockMovement
+from inventory.services import record_stock_movement
 
 logger = logging.getLogger(__name__)
 
@@ -74,10 +76,18 @@ def _cart_lines(request):
 
 
 def _restore_stock(order):
-    """Return an order's reserved stock to inventory (used when payment fails)."""
-    for item in order.items.all():
+    """Return reserved stock and record the returned movements."""
+    for item in order.items.select_related('product'):
         Product.objects.filter(pk=item.product_id).update(
             stock=F('stock') + item.quantity
+        )
+
+        record_stock_movement(
+            product=item.product,
+            order=order,
+            movement_type=StockMovement.MovementType.RETURNED,
+            quantity=item.quantity,
+            note="Stock returned after M-Pesa STK Push failure",
         )
 
 
@@ -219,6 +229,17 @@ def checkout(request):
 
                 Product.objects.filter(pk=product.pk).update(
                     stock=F('stock') - qty
+                )
+
+                record_stock_movement(
+                    product=product,
+                    order=order,
+                    movement_type=StockMovement.MovementType.RESERVED,
+                    quantity=qty,
+                    note="Stock reserved for checkout",
+                    created_by=(
+                        request.user if request.user.is_authenticated else None
+                    ),
                 )
 
             payment = Payment.objects.create(
