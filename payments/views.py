@@ -11,19 +11,27 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from store.models import Payment, Product
+from inventory.models import StockMovement
+from inventory.services import record_stock_movement
 
 logger = logging.getLogger(__name__)
 
 FROM_EMAIL = 'shop@example.com'
 
-
 def _restore_payment_stock(order):
-    """Restore reserved product stock when an M-Pesa payment fails."""
-    for item in order.items.all():
+    """Restore reserved stock and record returned movements."""
+    for item in order.items.select_related('product'):
         Product.objects.filter(pk=item.product_id).update(
             stock=F('stock') + item.quantity
         )
 
+        record_stock_movement(
+            product=item.product,
+            order=order,
+            movement_type=StockMovement.MovementType.RETURNED,
+            quantity=item.quantity,
+            note="Stock returned after failed M-Pesa payment",
+        )
 
 def _send_payment_email(subject, message, recipient):
     """Send a payment email without breaking the callback if email fails."""
