@@ -109,6 +109,11 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=8, decimal_places=2)
     mpesa_phone = models.CharField(max_length=20, blank=True)
     transaction_id = models.CharField(max_length=100, blank=True)
+    mpesa_receipt_number = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

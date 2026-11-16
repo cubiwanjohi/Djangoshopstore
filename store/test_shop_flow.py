@@ -575,18 +575,32 @@ class CheckoutTests(TestCase):
 # M-Pesa callback
 # --------------------------------------------------------------------------
 
-def callback_payload(checkout_request_id='ws_CO_TEST_001', result_code=0):
-    return {
-        'Body': {
-            'stkCallback': {
-                'MerchantRequestID': 'merchant-1',
-                'CheckoutRequestID': checkout_request_id,
-                'ResultCode': result_code,
-                'ResultDesc': 'Result description from Safaricom',
-            }
-        }
+def callback_payload(
+    checkout_request_id='ws_CO_TEST_001',
+    result_code=0,
+    amount=600,
+    receipt_number='QGH123ABC',
+):
+    stk_callback = {
+        'MerchantRequestID': 'merchant-1',
+        'CheckoutRequestID': checkout_request_id,
+        'ResultCode': result_code,
+        'ResultDesc': 'Result description from Safaricom',
     }
 
+    if result_code == 0:
+        stk_callback['CallbackMetadata'] = {
+            'Item': [
+                {'Name': 'Amount', 'Value': amount},
+                {'Name': 'MpesaReceiptNumber', 'Value': receipt_number},
+            ]
+        }
+
+    return {
+        'Body': {
+            'stkCallback': stk_callback,
+        }
+    }
 
 class MpesaCallbackTests(TestCase):
     def setUp(self):
@@ -656,6 +670,12 @@ class MpesaCallbackTests(TestCase):
         self.assertEqual(self.order.status, 'paid')
         self.assertEqual(self.product.stock, 8)
 
+        # Verify that the M-Pesa receipt number was saved.
+        self.assertEqual(
+            self.payment.mpesa_receipt_number,
+            'QGH123ABC',
+        )
+
         self.assertEqual(
             StockMovement.objects.filter(
                 order=self.order,
@@ -671,6 +691,48 @@ class MpesaCallbackTests(TestCase):
             ).count(),
             0,
         )
+
+    def test_successful_callback_saves_mpesa_receipt_number(self):
+        self.post_json(callback_payload(result_code=0))
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'completed')
+        self.assertEqual(
+            self.payment.mpesa_receipt_number,
+            'QGH123ABC',
+        )
+
+    def test_successful_callback_with_wrong_amount_stays_pending(self):
+        response = self.post_json(
+            callback_payload(result_code=0, amount=599)
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.payment.mpesa_receipt_number, '')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_successful_callback_without_receipt_stays_pending(self):
+        response = self.post_json(
+            callback_payload(result_code=0, receipt_number='')
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.payment.mpesa_receipt_number, '')
+        self.assertEqual(len(mail.outbox), 0)
+
 
     def test_successful_payment_emails_the_customer(self):
         self.post_json(callback_payload(result_code=0))
