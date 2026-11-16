@@ -605,3 +605,212 @@ a:focus-visible {
     padding: 0.75rem;
   }
 }
+
+/* ==========================================
+   INVENTORY DASHBOARD
+========================================== */
+
+.inventory-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.inventory-heading {
+  margin-bottom: 0.25rem;
+}
+
+.inventory-heading h1 {
+  margin: 0 0 0.4rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.inventory-heading p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Summary cards */
+
+.inventory-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.inventory-card {
+  position: relative;
+  padding: 1.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.inventory-card::before {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--brand);
+  content: "";
+}
+
+.inventory-card h3 {
+  margin: 0 0 0.8rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.inventory-card p {
+  margin: 0;
+  color: var(--text);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.inventory-card:last-child::before {
+  background: var(--warn);
+}
+
+/* Dashboard sections */
+
+.inventory-section {
+  padding: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.inventory-section h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.25rem;
+}
+
+.inventory-section > p {
+  color: var(--muted);
+}
+
+.inventory-section a {
+  font-weight: 600;
+}
+
+/* Tables */
+
+.inventory-table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.inventory-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.inventory-table th {
+  padding: 0.9rem 1rem;
+  background: #f0fdf4;
+  color: var(--brand-dark);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.inventory-table td {
+  padding: 0.9rem 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+
+.inventory-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.inventory-table td:first-child {
+  font-weight: 600;
+}
+
+/* Quick links */
+
+.inventory-section a {
+  color: var(--brand);
+}
+
+.inventory-section a:hover {
+  color: var(--brand-dark);
+}
+
+/* Responsive dashboard */
+
+@media (max-width: 700px) {
+  .inventory-summary {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
+  }
+
+  .inventory-card {
+    padding: 1.2rem;
+  }
+
+  .inventory-card p {
+    font-size: 1.7rem;
+  }
+
+  .inventory-heading h1 {
+    font-size: 1.65rem;
+  }
+
+  .inventory-section {
+    padding: 1rem;
+  }
+
+  .inventory-table th,
+  .inventory-table td {
+    padding: 0.7rem;
+  }
+}
+
+
+/* Fix inventory action button visibility */
+.inventory-dashboard .btn,
+.inventory-dashboard a.btn,
+.inventory-dashboard button.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    min-height: 46px;
+
+    background-color: #087f3e !important;
+    color: #ffffff !important;
+
+    font-size: 15px !important;
+    font-weight: 600;
+    line-height: 1.4;
+
+    text-decoration: none !important;
+    border: 1px solid #087f3e;
+    border-radius: 10px;
+
+    cursor: pointer;
+    opacity: 1;
+}
+
+.inventory-dashboard .btn:hover,
+.inventory-dashboard a.btn:hover,
+.inventory-dashboard button.btn:hover {
+    background-color: #056b33 !important;
+    color: #ffffff !important;
+    border-color: #056b33;
+}

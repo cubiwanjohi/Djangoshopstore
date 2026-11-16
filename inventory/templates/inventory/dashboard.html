@@ -1,0 +1,252 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}Inventory Dashboard | ShopStore{% endblock %}
+
+{% block content %}
+
+<section class="inventory-dashboard">
+
+    <!-- Dashboard heading -->
+    <div class="inventory-heading">
+        <h1>Inventory Dashboard</h1>
+        <p>Monitor product stock and recent inventory activity.</p>
+    </div>
+
+    <!-- Inventory summary cards -->
+    <div class="inventory-summary">
+
+        <div class="inventory-card">
+            <h3>Total Products</h3>
+            <p>{{ total_products }}</p>
+        </div>
+
+        <div class="inventory-card">
+            <h3>Total Units in Stock</h3>
+            <p>{{ total_stock }}</p>
+        </div>
+
+        <div class="inventory-card">
+            <h3>Low Stock Products</h3>
+            <p>{{ low_stock_count }}</p>
+        </div>
+
+    </div>
+
+    <!-- Stock management actions -->
+    <section class="inventory-section">
+
+        <h2>Stock Management</h2>
+
+        <p>Manage incoming stock and record stock removals.</p>
+
+        <div class="form-actions">
+
+            <a href="{% url 'inventory:receive_stock' %}" class="btn btn-primary">
+                Receive Stock
+            </a>
+
+            <a href="{% url 'inventory:remove_stock' %}" class="btn">
+                Remove Stock
+            </a>
+
+        </div>
+
+    </section>
+
+    <!-- Inventory settings -->
+    <section class="inventory-section">
+
+        <h2>Inventory Settings</h2>
+
+        <p>
+            Configure when a product should be considered low in stock.
+        </p>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <div class="form-group">
+                {{ threshold_form.low_stock_threshold.label_tag }}
+                {{ threshold_form.low_stock_threshold }}
+
+                {% for error in threshold_form.low_stock_threshold.errors %}
+                    <p class="field-error">{{ error }}</p>
+                {% endfor %}
+
+                <small>
+                    Products with this quantity or fewer will trigger
+                    a low-stock alert.
+                </small>
+            </div>
+
+            {% if threshold_form.non_field_errors %}
+                <div class="form-errors">
+                    {% for error in threshold_form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    Save Threshold
+                </button>
+            </div>
+
+        </form>
+
+    </section>
+
+    <!-- Low stock alerts -->
+    <section class="inventory-section">
+
+        <h2>Low Stock Alerts</h2>
+
+        <p>
+            Products with {{ low_stock_threshold }} or fewer units remaining.
+        </p>
+
+        {% if low_stock_products %}
+
+            <div class="inventory-table-wrapper">
+
+                <table class="inventory-table">
+
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Available Stock</th>
+                            <th>Price</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for product in low_stock_products %}
+
+                            <tr>
+                                <td>{{ product.name }}</td>
+                                <td>{{ product.stock }}</td>
+                                <td>KSh {{ product.price }}</td>
+
+                                <td>
+                                    <a href="{{ product.get_absolute_url }}">
+                                        View Product
+                                    </a>
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        {% else %}
+
+            <p>No low-stock products found.</p>
+
+        {% endif %}
+
+    </section>
+
+    <!-- Recent stock movements -->
+    <section class="inventory-section">
+
+        <h2>Recent Stock Movements</h2>
+
+        {% if recent_movements %}
+
+            <div class="inventory-table-wrapper">
+
+                <table class="inventory-table">
+
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Product</th>
+                            <th>Movement</th>
+                            <th>Quantity</th>
+                            <th>Staff Member</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for movement in recent_movements %}
+
+                            <tr>
+                                <td>
+                                    {{ movement.created_at|date:"d M Y, H:i" }}
+                                </td>
+
+                                <td>{{ movement.product.name }}</td>
+
+                                <td>
+                                    {{ movement.get_movement_type_display }}
+                                </td>
+
+                                <td>{{ movement.quantity }}</td>
+
+                                <td>
+                                    {% if movement.created_by %}
+                                        {{ movement.created_by.username }}
+                                    {% else %}
+                                        System
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {{ movement.note|default:"-"|truncatechars:40 }}
+                                </td>
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        {% else %}
+
+            <p>No stock movements recorded yet.</p>
+
+        {% endif %}
+
+    </section>
+
+    <!-- Dashboard navigation -->
+    <section class="inventory-section">
+
+        <h2>Quick Links</h2>
+
+        <p>
+            <a href="{% url 'inventory:reports' %}">
+                View Inventory Reports
+            </a>
+        </p>
+
+        <p>
+            <a href="{% url 'admin:index' %}">
+                Open Django Administration
+            </a>
+        </p>
+
+        <p>
+            <a href="{% url 'product_list' %}">
+                Return to ShopStore
+            </a>
+        </p>
+
+    </section>
+
+</section>
+
+{% endblock %}

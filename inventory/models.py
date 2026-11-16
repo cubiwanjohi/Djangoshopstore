@@ -60,3 +60,35 @@ class StockMovement(models.Model):
             f"{self.get_movement_type_display()} - "
             f"{self.product.name} ({self.quantity})"
         )
+
+class InventorySettings(models.Model):
+    """
+    Store inventory configuration.
+
+    The application uses one settings record with primary key 1.
+    """
+
+    low_stock_threshold = models.PositiveIntegerField(
+        default=5,
+        validators=[MinValueValidator(0)],
+        help_text="Products at or below this quantity are considered low stock.",
+    )
+
+    class Meta:
+        verbose_name = "Inventory Settings"
+        verbose_name_plural = "Inventory Settings"
+
+    def __str__(self):
+        return f"Low stock threshold: {self.low_stock_threshold}"
+
+    @classmethod
+    def load(cls):
+        settings, created = cls.objects.get_or_create(
+            pk=1,
+            defaults={"low_stock_threshold": 5},
+        )
+        return settings
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)

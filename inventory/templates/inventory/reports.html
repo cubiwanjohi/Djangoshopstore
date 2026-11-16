@@ -1,0 +1,147 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}Inventory Reports | ShopStore{% endblock %}
+
+{% block content %}
+
+<section class="inventory-dashboard">
+
+    <!-- Reports heading -->
+    <div class="inventory-heading">
+        <h1>Inventory Reports</h1>
+        <p>Review stock levels, inventory value and stock movement activity.</p>
+    </div>
+
+    <!-- Inventory summary -->
+    <div class="inventory-summary">
+
+        <div class="inventory-card">
+            <h3>Total Products</h3>
+            <p>{{ total_products }}</p>
+        </div>
+
+        <div class="inventory-card">
+            <h3>Total Units in Stock</h3>
+            <p>{{ total_stock }}</p>
+        </div>
+
+        <div class="inventory-card">
+            <h3>Inventory Value</h3>
+            <p>KSh {{ inventory_value|floatformat:2 }}</p>
+        </div>
+
+        <div class="inventory-card">
+            <h3>Low Stock Products</h3>
+            <p>{{ low_stock_count }}</p>
+        </div>
+
+    </div>
+
+    <!-- Stock movement report -->
+    <section class="inventory-section">
+
+        <h2>Stock Movement Summary</h2>
+
+        <div class="inventory-summary">
+
+            <div class="inventory-card">
+                <h3>Stock Received</h3>
+                <p>{{ total_received }}</p>
+            </div>
+
+            <div class="inventory-card">
+                <h3>Stock Removed</h3>
+                <p>{{ total_removed }}</p>
+            </div>
+
+            <div class="inventory-card">
+                <h3>Stock Reserved</h3>
+                <p>{{ total_reserved }}</p>
+            </div>
+
+            <div class="inventory-card">
+                <h3>Stock Returned</h3>
+                <p>{{ total_returned }}</p>
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- Low stock report -->
+    <section class="inventory-section">
+
+        <h2>Low Stock Report</h2>
+
+        <p>
+            Products with {{ low_stock_threshold }} or fewer units remaining.
+        </p>
+
+        {% if low_stock_products %}
+
+            <div class="inventory-table-wrapper">
+
+                <table class="inventory-table">
+
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Available Stock</th>
+                            <th>Unit Price</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        {% for product in low_stock_products %}
+
+                            <tr>
+                                <td>{{ product.name }}</td>
+                                <td>{{ product.stock }}</td>
+                                <td>KSh {{ product.price }}</td>
+                            </tr>
+
+                        {% endfor %}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+        {% else %}
+
+            <p>No low-stock products found.</p>
+
+        {% endif %}
+
+    </section>
+
+    <!-- Report actions -->
+    <section class="inventory-section">
+
+        <h2>Export Reports</h2>
+
+        <p>
+            Download a CSV file containing the current inventory snapshot.
+        </p>
+
+        <div class="form-actions">
+
+            <a href="{% url 'inventory:export_inventory_csv' %}"
+               class="btn btn-primary">
+                Download Inventory CSV
+            </a>
+
+            <a href="{% url 'inventory:dashboard' %}" class="btn">
+                Back to Inventory Dashboard
+            </a>
+
+        </div>
+
+    </section>
+
+</section>
+
+{% endblock %}
