@@ -1,0 +1,74 @@
+{% extends "store/base.html" %}
+
+{% block title %}{{ page_title }} | ShopStore{% endblock %}
+
+{% block content %}
+
+<section class="inventory-dashboard">
+
+    <div class="inventory-heading">
+        <h1>{{ page_title }}</h1>
+        <p>Update product stock and record the inventory movement.</p>
+    </div>
+
+    <section class="inventory-section">
+
+        <form method="POST">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="form-errors">
+                    {% for error in form.non_field_errors %}
+                        <p>{{ error }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="form-group">
+                {{ form.product.label_tag }}
+                {{ form.product }}
+
+                {% for error in form.product.errors %}
+                    <p class="field-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="form-group">
+                {{ form.quantity.label_tag }}
+                {{ form.quantity }}
+
+                {% if form.quantity.help_text %}
+                    <small>{{ form.quantity.help_text }}</small>
+                {% endif %}
+
+                {% for error in form.quantity.errors %}
+                    <p class="field-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="form-group">
+                {{ form.note.label_tag }}
+                {{ form.note }}
+
+                {% for error in form.note.errors %}
+                    <p class="field-error">{{ error }}</p>
+                {% endfor %}
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    {{ button_text }}
+                </button>
+
+                <a href="{% url 'inventory:dashboard' %}" class="btn">
+                    Cancel
+                </a>
+            </div>
+
+        </form>
+
+    </section>
+
+</section>
+
+{% endblock %}

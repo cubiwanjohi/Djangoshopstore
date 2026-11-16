@@ -1,0 +1,80 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}{{ product.name }} Stock History | ShopStore{% endblock %}
+
+{% block content %}
+<section class="inventory-dashboard">
+
+    <div class="inventory-heading">
+        <h1>{{ product.name }} — Stock History</h1>
+        <p>Review all recorded inventory movements for this product.</p>
+    </div>
+
+    <div class="inventory-summary">
+        <div class="inventory-card">
+            <h3>Product</h3>
+            <p>{{ product.name }}</p>
+        </div>
+
+        <div class="inventory-card">
+            <h3>Current Stock</h3>
+            <p>{{ product.stock }}</p>
+        </div>
+
+        <div class="inventory-card">
+            <h3>Unit Price</h3>
+            <p>KSh {{ product.price }}</p>
+        </div>
+    </div>
+
+    <section class="inventory-section">
+        <h2>Movement Records</h2>
+
+        {% if movements %}
+            <div class="inventory-table-wrapper">
+                <table class="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Movement</th>
+                            <th>Quantity</th>
+                            <th>Staff Member</th>
+                            <th>Note</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movement in movements %}
+                            <tr>
+                                <td>{{ movement.created_at|date:"d M Y, H:i" }}</td>
+                                <td>{{ movement.get_movement_type_display }}</td>
+                                <td>{{ movement.quantity }}</td>
+                                <td>
+                                    {% if movement.created_by %}
+                                        {{ movement.created_by.username }}
+                                    {% else %}
+                                        System
+                                    {% endif %}
+                                </td>
+                                <td>{{ movement.note|default:"-" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p>No stock movements have been recorded for this product.</p>
+        {% endif %}
+    </section>
+
+    <div class="form-actions">
+        <a href="{% url 'inventory:movement_history' %}" class="btn">
+            All Stock Movements
+        </a>
+        <a href="{% url 'inventory:dashboard' %}" class="btn">
+            Back to Dashboard
+        </a>
+    </div>
+
+</section>
+{% endblock %}
