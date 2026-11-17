@@ -1,0 +1,153 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}Order Fulfilment | ShopStore{% endblock %}
+
+{% block content %}
+<div class="fulfilment-dashboard">
+
+    <div class="fulfilment-heading">
+        <div>
+            <h1>Order Fulfilment</h1>
+            <p>Manage customer orders, dispatches and deliveries.</p>
+        </div>
+
+        <span class="fulfilment-count">
+            {{ orders|length }} Orders
+        </span>
+    </div>
+
+    <!-- Search and filters -->
+    <section class="fulfilment-section">
+        <form method="GET" class="fulfilment-filters">
+
+            <div>
+                <label for="search">Search orders</label>
+                <input
+                    type="text"
+                    id="search"
+                    name="search"
+                    placeholder="Order number or customer name"
+                    value="{{ search }}"
+                >
+            </div>
+
+            <div>
+                <label for="order_status">Payment status</label>
+                <select id="order_status" name="order_status">
+                    <option value="">All statuses</option>
+                    <option value="pending"
+                        {% if order_status == "pending" %}selected{% endif %}>
+                        Pending
+                    </option>
+                    <option value="paid"
+                        {% if order_status == "paid" %}selected{% endif %}>
+                        Paid
+                    </option>
+                </select>
+            </div>
+
+            <div>
+                <label for="delivery_status">Delivery status</label>
+                <select id="delivery_status" name="delivery_status">
+                    <option value="">All statuses</option>
+                    <option value="processing"
+                        {% if delivery_status == "processing" %}selected{% endif %}>
+                        Processing
+                    </option>
+                    <option value="shipped"
+                        {% if delivery_status == "shipped" %}selected{% endif %}>
+                        Shipped
+                    </option>
+                    <option value="delivered"
+                        {% if delivery_status == "delivered" %}selected{% endif %}>
+                        Delivered
+                    </option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn">Apply filters</button>
+
+        </form>
+    </section>
+
+    <!-- Orders table -->
+    <section class="fulfilment-section">
+
+        {% if orders %}
+        <div class="fulfilment-table-wrapper">
+            <table class="fulfilment-table">
+
+                <thead>
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th>Total</th>
+                        <th>Payment</th>
+                        <th>Delivery</th>
+                        <th>Tracking</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><strong>#{{ order.id }}</strong></td>
+
+                        <td>{{ order.customer_name }}</td>
+
+                        <td>
+                            {{ order.created_at|date:"d M Y, H:i" }}
+                        </td>
+
+                        <td>
+                            KSh {{ order.total|floatformat:2 }}
+                        </td>
+
+                        <td>
+                            <span class="status-label status-{{ order.status }}">
+                                {{ order.get_status_display }}
+                            </span>
+                        </td>
+
+                        <td>
+                            <span class="status-label status-{{ order.delivery_status }}">
+                                {{ order.get_delivery_status_display }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {% if order.tracking_number %}
+                                {{ order.tracking_number }}
+                            {% else %}
+                                <span class="muted">Not assigned</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <a
+                                href="{% url 'orders:fulfilment_order_detail' order.id %}"
+                                class="btn">
+                                Manage
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
+
+        {% else %}
+        <div class="empty">
+            <h2>No orders found</h2>
+            <p>Try changing your search or filters.</p>
+        </div>
+        {% endif %}
+
+    </section>
+
+</div>
+{% endblock %}

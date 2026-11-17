@@ -1,0 +1,283 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}Order #{{ order.id }} | ShopStore{% endblock %}
+
+{% block content %}
+<div class="fulfilment-dashboard">
+
+    <!-- Heading -->
+    <div class="fulfilment-heading">
+        <div>
+            <p class="breadcrumb">
+                <a href="{% url 'orders:fulfilment_dashboard' %}">
+                    Order Fulfilment
+                </a>
+                / Order #{{ order.id }}
+            </p>
+            <h1>Order #{{ order.id }}</h1>
+            <p>Review order information and manage delivery.</p>
+        </div>
+
+        <a href="{% url 'orders:fulfilment_dashboard' %}"
+           class="btn btn-outline">
+            Back to orders
+        </a>
+    </div>
+
+    <!-- Django messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert
+                {% if message.tags == 'success' %}alert-success
+                {% elif message.tags == 'error' %}alert-error
+                {% elif message.tags == 'warning' %}alert-warning
+                {% else %}alert-info{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="fulfilment-details">
+
+        <!-- Customer and order information -->
+        <section class="fulfilment-section fulfilment-info">
+            <h2>Customer information</h2>
+
+            <p><strong>Name:</strong> {{ order.customer_name }}</p>
+            <p><strong>Email:</strong> {{ order.customer_email }}</p>
+            <p><strong>Phone:</strong> {{ order.shipping_phone }}</p>
+            <p><strong>Address:</strong> {{ order.shipping_address }}</p>
+            <p><strong>City:</strong> {{ order.shipping_city }}</p>
+
+            <h2>Order status</h2>
+
+            <p>
+                <strong>Payment:</strong>
+                <span class="status-label status-{{ order.status }}">
+                    {{ order.get_status_display }}
+                </span>
+            </p>
+
+            <p>
+                <strong>Delivery:</strong>
+                <span class="status-label status-{{ order.delivery_status }}">
+                    {{ order.get_delivery_status_display }}
+                </span>
+            </p>
+
+            <p>
+                <strong>Tracking number:</strong>
+                {% if order.tracking_number %}
+                    {{ order.tracking_number }}
+                {% else %}
+                    <span class="muted">Not assigned</span>
+                {% endif %}
+            </p>
+
+            <p>
+                <strong>Order date:</strong>
+                {{ order.created_at|date:"d M Y, H:i" }}
+            </p>
+
+            <p>
+                <strong>Shipped at:</strong>
+                {% if order.shipped_at %}
+                    {{ order.shipped_at|date:"d M Y, H:i" }}
+                {% else %}
+                    <span class="muted">Not shipped</span>
+                {% endif %}
+            </p>
+
+            <p>
+                <strong>Delivered at:</strong>
+                {% if order.delivered_at %}
+                    {{ order.delivered_at|date:"d M Y, H:i" }}
+                {% else %}
+                    <span class="muted">Not delivered</span>
+                {% endif %}
+            </p>
+        </section>
+
+        <!-- Fulfilment actions -->
+        <section class="fulfilment-section">
+            <h2>Manage delivery</h2>
+
+            {% if order.status != "paid" %}
+                <div class="notice warn">
+                    <h2>Payment required</h2>
+                    <p>
+                        This order cannot be dispatched until its payment
+                        has been confirmed.
+                    </p>
+                </div>
+
+            {% elif order.delivery_status == "processing" %}
+                <p class="muted">
+                    This order is paid and ready for dispatch.
+                </p>
+
+                <form method="POST"
+                      action="{% url 'orders:update_fulfilment_status' order.id %}"
+                      class="fulfilment-form">
+                    {% csrf_token %}
+
+                    <input type="hidden"
+                           name="delivery_status"
+                           value="shipped">
+
+                    <div class="field">
+                        <label for="tracking_number">
+                            Tracking number
+                        </label>
+                        <input
+                            type="text"
+                            id="tracking_number"
+                            name="tracking_number"
+                            maxlength="100"
+                            placeholder="Enter courier tracking number"
+                        >
+                    </div>
+
+                    <div class="field">
+                        <label for="dispatch_note">
+                            Dispatch note
+                        </label>
+                        <textarea
+                            id="dispatch_note"
+                            name="note"
+                            rows="3"
+                            placeholder="Optional dispatch details"
+                        ></textarea>
+                    </div>
+
+                    <button type="submit" class="btn">
+                        Mark as shipped
+                    </button>
+                </form>
+
+            {% elif order.delivery_status == "shipped" %}
+                <div class="notice">
+                    <h2>Order dispatched</h2>
+                    <p>
+                        This order has been shipped. Confirm delivery
+                        after the customer receives the package.
+                    </p>
+                </div>
+
+                <form method="POST"
+                      action="{% url 'orders:update_fulfilment_status' order.id %}"
+                      class="fulfilment-form">
+                    {% csrf_token %}
+
+                    <input type="hidden"
+                           name="delivery_status"
+                           value="delivered">
+
+                    <div class="field">
+                        <label for="delivery_note">
+                            Delivery note
+                        </label>
+                        <textarea
+                            id="delivery_note"
+                            name="note"
+                            rows="3"
+                            placeholder="Optional delivery confirmation"
+                        ></textarea>
+                    </div>
+
+                    <button type="submit" class="btn">
+                        Mark as delivered
+                    </button>
+                </form>
+
+            {% else %}
+                <div class="notice">
+                    <h2>Order completed</h2>
+                    <p>This order has been successfully delivered.</p>
+                </div>
+            {% endif %}
+        </section>
+
+    </div>
+
+    <!-- Ordered products -->
+    <section class="fulfilment-section">
+        <h2>Products in this order</h2>
+
+        <div class="fulfilment-table-wrapper">
+            <table class="fulfilment-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Unit price</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in order.items.all %}
+                    <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>KSh {{ item.price|floatformat:2 }}</td>
+                        <td>
+                            KSh {{ item.subtotal|floatformat:2 }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                <tfoot>
+                    <tr>
+                        <td colspan="3"><strong>Order total</strong></td>
+                        <td>
+                            <strong>
+                                KSh {{ order.total|floatformat:2 }}
+                            </strong>
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </section>
+
+    <!-- Status history -->
+    <section class="fulfilment-section">
+        <h2>Delivery history</h2>
+
+        {% if history %}
+            {% for entry in history %}
+                <div class="fulfilment-history-entry">
+                    <strong>
+                        {{ entry.previous_status|title }}
+                        &rarr;
+                        {{ entry.new_status|title }}
+                    </strong>
+
+                    <p class="muted small">
+                        Changed by:
+                        {% if entry.changed_by %}
+                            {{ entry.changed_by.username }}
+                        {% else %}
+                            Unknown user
+                        {% endif %}
+                        &middot;
+                        {{ entry.created_at|date:"d M Y, H:i" }}
+                    </p>
+
+                    {% if entry.note %}
+                        <p>{{ entry.note }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="muted">
+                No delivery status changes have been recorded yet.
+            </p>
+        {% endif %}
+    </section>
+
+</div>
+{% endblock %}
