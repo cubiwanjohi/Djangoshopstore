@@ -19,6 +19,9 @@ urlpatterns = [
 
     # M-Pesa payments
     path("", include("payments.urls")),
+
+    # Order fulfilment management
+    path("orders/", include("orders.urls")),
 ]
 
 

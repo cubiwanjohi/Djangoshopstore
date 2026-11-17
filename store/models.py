@@ -71,6 +71,22 @@ class Order(models.Model):
         default='processing'
     )
 
+    tracking_number = models.CharField(
+        max_length=100,
+        blank=True,
+        default=''
+    )
+
+    shipped_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    delivered_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
     def total(self):
         return sum(item.subtotal() for item in self.items.all())
 
