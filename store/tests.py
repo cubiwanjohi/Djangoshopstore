@@ -347,6 +347,7 @@ class MpesaCallbackTests(TestCase):
             customer_name="Peter",
             customer_email="peter@example.com",
         )
+
         self.payment = Payment.objects.create(
             order=self.order,
             amount=Decimal("3000.00"),
@@ -354,13 +355,28 @@ class MpesaCallbackTests(TestCase):
         )
 
     def send_callback(self, result_code):
+        """Send a simulated Safaricom M-Pesa callback."""
+
+        stk_callback = {
+            "CheckoutRequestID": "TEST-CHECKOUT-456",
+            "ResultCode": result_code,
+            "ResultDesc": "Test result",
+        }
+
+        if result_code == 0:
+            stk_callback["CallbackMetadata"] = {
+                "Item": [
+                    {"Name": "Amount", "Value": 3000},
+                    {
+                        "Name": "MpesaReceiptNumber",
+                        "Value": "QGH123ABC",
+                    },
+                ]
+            }
+
         payload = {
             "Body": {
-                "stkCallback": {
-                    "CheckoutRequestID": "TEST-CHECKOUT-456",
-                    "ResultCode": result_code,
-                    "ResultDesc": "Test result",
-                }
+                "stkCallback": stk_callback,
             }
         }
 
@@ -380,6 +396,10 @@ class MpesaCallbackTests(TestCase):
 
         self.assertEqual(self.payment.status, "completed")
         self.assertEqual(self.order.status, "paid")
+        self.assertEqual(
+            self.payment.mpesa_receipt_number,
+            "QGH123ABC",
+        )
 
     def test_failed_callback_marks_payment_failed(self):
         response = self.send_callback(1)
