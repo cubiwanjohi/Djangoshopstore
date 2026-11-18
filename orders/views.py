@@ -5,6 +5,10 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from notifications.services import (
+    send_order_delivered_notification,
+    send_order_shipped_notification,
+)
 from store.models import Order
 
 from .models import OrderStatusHistory
@@ -126,6 +130,7 @@ def update_fulfilment_status(request, pk):
 
         if new_status == "shipped":
             order.shipped_at = timezone.now()
+
             if tracking_number:
                 order.tracking_number = tracking_number
 
@@ -148,6 +153,19 @@ def update_fulfilment_status(request, pk):
             changed_by=request.user,
             note=note,
         )
+
+        # Schedule customer notification after successful commit.
+        if new_status == "shipped":
+            transaction.on_commit(
+                lambda order_id=order.pk:
+                    send_order_shipped_notification(order_id)
+            )
+
+        elif new_status == "delivered":
+            transaction.on_commit(
+                lambda order_id=order.pk:
+                    send_order_delivered_notification(order_id)
+            )
 
     messages.success(
         request,
