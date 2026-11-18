@@ -7,6 +7,7 @@ from django.urls import reverse
 from store.models import Order, OrderItem, Product
 
 from .models import OrderStatusHistory
+from unittest.mock import patch
 
 User = get_user_model()
 
@@ -255,3 +256,38 @@ class OrderFulfilmentTests(TestCase):
                 order=self.order
             ).exists()
         )
+    @patch("orders.views.send_order_shipped_notification")
+    def test_shipping_notification_is_triggered(self, mock_notification):
+        self.client.force_login(self.staff)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.update_url,
+                {
+                    "delivery_status": "shipped",
+                    "tracking_number": "TRACK123",
+                    "note": "Package dispatched",
+                },
+            )
+
+        self.assertRedirects(response, self.detail_url)
+        mock_notification.assert_called_once_with(self.order.pk)
+
+    @patch("orders.views.send_order_delivered_notification")
+    def test_delivery_notification_is_triggered(self, mock_notification):
+        self.order.delivery_status = "shipped"
+        self.order.save(update_fields=["delivery_status"])
+
+        self.client.force_login(self.staff)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                self.update_url,
+                {
+                    "delivery_status": "delivered",
+                    "note": "Package delivered",
+                },
+            )
+
+        self.assertRedirects(response, self.detail_url)
+        mock_notification.assert_called_once_with(self.order.pk)
