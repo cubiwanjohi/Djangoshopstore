@@ -1,118 +1,201 @@
 
 {% extends "store/base.html" %}
 
-{% block title %}Order #{{ order.id }} | ShopStore{% endblock %}
+{% block title %}Track Order #{{ order.pk }} | ShopStore{% endblock %}
 
 {% block content %}
 
-<section class="auth-container">
-    <div class="auth-card">
+<section class="customer-tracking-page">
 
-        <h1>Order #{{ order.id }}</h1>
+    <div class="customer-orders-heading">
+        <div>
+            <p class="customer-eyebrow">ORDER TRACKING</p>
+            <h1>Order #{{ order.pk }}</h1>
+            <p>Placed {{ order.created_at|date:"d M Y, H:i" }}</p>
+        </div>
 
-        <p>
-            Placed on:
-            {{ order.created_at|date:"d M Y, H:i" }}
+        <a href="{% url 'customers:customer_orders' %}"
+           class="customer-secondary-btn">
+            Back to My Orders
+        </a>
+    </div>
+
+    <!-- Delivery progress -->
+    <div class="customer-tracking-card">
+
+        <h2>Delivery Progress</h2>
+
+        <div class="customer-order-progress">
+
+            <div class="tracking-stage completed">
+                <span class="tracking-dot"></span>
+                <span>Processing</span>
+            </div>
+
+            <div class="tracking-line {% if order.delivery_status == 'shipped' or order.delivery_status == 'delivered' %}completed{% endif %}"></div>
+
+            <div class="tracking-stage {% if order.delivery_status == 'shipped' or order.delivery_status == 'delivered' %}completed{% endif %}">
+                <span class="tracking-dot"></span>
+                <span>Shipped</span>
+            </div>
+
+            <div class="tracking-line {% if order.delivery_status == 'delivered' %}completed{% endif %}"></div>
+
+            <div class="tracking-stage {% if order.delivery_status == 'delivered' %}completed{% endif %}">
+                <span class="tracking-dot"></span>
+                <span>Delivered</span>
+            </div>
+
+        </div>
+
+        <p class="customer-current-status">
+            Current delivery status:
+            <span class="status-label status-{{ order.delivery_status }}">
+                {{ order.get_delivery_status_display }}
+            </span>
         </p>
 
-        <hr>
+        {% if order.tracking_number %}
+            <div class="customer-tracking-number">
+                Tracking number:
+                <strong>{{ order.tracking_number }}</strong>
+            </div>
+        {% else %}
+            <p>Your tracking number will appear here once your order is dispatched.</p>
+        {% endif %}
 
-        <h3>Order Information</h3>
+        {% if order.shipped_at %}
+            <p>Dispatched: {{ order.shipped_at|date:"d M Y, H:i" }}</p>
+        {% endif %}
 
-        <p>Order status: {{ order.get_status_display }}</p>
+        {% if order.delivered_at %}
+            <p>Delivered: {{ order.delivered_at|date:"d M Y, H:i" }}</p>
+        {% endif %}
 
-        <p>
-            Delivery status:
-            {{ order.get_delivery_status_display }}
-        </p>
+    </div>
 
-        <h3>Purchased Products</h3>
+    <!-- Order status history -->
+    <div class="customer-tracking-card">
 
-        {% for item in order.items.all %}
+        <h2>Order Status History</h2>
 
-            <div class="order-product">
+        {% for event in history %}
 
-                <h4>{{ item.product.name }}</h4>
+            <div class="customer-history-entry">
 
-                <p>Quantity: {{ item.quantity }}</p>
+                <div class="customer-history-dot"></div>
 
-                <p>
-                    Unit price:
-                    KSh {{ item.price|floatformat:2 }}
-                </p>
+                <div>
+                    <strong>{{ event.get_new_status_display }}</strong>
 
-                <p>
-                    Subtotal:
-                    KSh {{ item.subtotal|floatformat:2 }}
-                </p>
+                    <p>{{ event.created_at|date:"d M Y, H:i" }}</p>
+
+                    {% if event.new_status == "shipped" %}
+                        <p>Your order has been dispatched.</p>
+                    {% elif event.new_status == "delivered" %}
+                        <p>Your order has been marked as delivered.</p>
+                    {% elif event.new_status == "processing" %}
+                        <p>Your order is being processed.</p>
+                    {% endif %}
+                </div>
 
             </div>
 
-            <hr>
-
         {% empty %}
 
-            <p>No products found for this order.</p>
+            <p>Your order is awaiting its first delivery update.</p>
 
         {% endfor %}
 
-        <h3>Order Total</h3>
+    </div>
 
-        <p>
+    <!-- Purchased products -->
+    <div class="customer-tracking-card">
+
+        <h2>Purchased Products</h2>
+
+        {% for item in order.items.all %}
+
+            <div class="customer-product-row">
+
+                <div>
+                    <h3>{{ item.product.name }}</h3>
+                    <p>Quantity: {{ item.quantity }}</p>
+                </div>
+
+                <strong>
+                    KSh {{ item.subtotal|floatformat:2 }}
+                </strong>
+
+            </div>
+
+        {% endfor %}
+
+        <div class="customer-total-row">
+            <span>Order Total</span>
             <strong>KSh {{ order.total|floatformat:2 }}</strong>
-        </p>
+        </div>
 
-        <hr>
+    </div>
 
-        <h3>Payment Information</h3>
+    <!-- Payment information -->
+    <div class="customer-tracking-card">
+
+        <h2>Payment Information</h2>
+
+        <p>Order payment status: {{ order.get_status_display }}</p>
 
         {% if order.payment %}
 
-            <p>Method: {{ order.payment.get_method_display }}</p>
-
-            <p>
-                Payment status:
-                {{ order.payment.get_status_display }}
-            </p>
+            <p>Payment method: {{ order.payment.get_method_display }}</p>
+            <p>Payment status: {{ order.payment.get_status_display }}</p>
 
             <p>
                 Amount:
                 KSh {{ order.payment.amount|floatformat:2 }}
             </p>
 
-            <p>
-                M-Pesa phone:
-                {{ order.payment.mpesa_phone }}
-            </p>
+            {% if order.payment.mpesa_phone %}
+                <p>
+                    M-Pesa phone:
+                    {{ order.payment.mpesa_phone }}
+                </p>
+            {% endif %}
 
             {% if order.payment.transaction_id %}
                 <p>
-                    Transaction reference:
+                    M-Pesa transaction reference:
                     {{ order.payment.transaction_id }}
+                </p>
+            {% endif %}
+
+            {% if order.payment.mpesa_receipt_number %}
+                <p>
+                    M-Pesa receipt:
+                    {{ order.payment.mpesa_receipt_number }}
                 </p>
             {% endif %}
 
         {% else %}
 
-            <p>No payment information is available.</p>
+            <p>Payment information is not yet available.</p>
 
         {% endif %}
 
-        <hr>
+    </div>
 
-        <h3>Delivery Information</h3>
+    <!-- Delivery address -->
+    <div class="customer-tracking-card">
+
+        <h2>Delivery Information</h2>
 
         <p>Recipient: {{ order.customer_name }}</p>
-        <p>Phone: {{ order.shipping_phone }}</p>
-        <p>Address: {{ order.shipping_address }}</p>
-        <p>City: {{ order.shipping_city }}</p>
-
-        <a href="{% url 'customers:customer_orders' %}"
-           class="btn btn-primary">
-            Back to My Orders
-        </a>
+        <p>Phone: {{ order.shipping_phone|default:"Not provided" }}</p>
+        <p>Address: {{ order.shipping_address|default:"Not provided" }}</p>
+        <p>City: {{ order.shipping_city|default:"Not provided" }}</p>
 
     </div>
+
 </section>
 
 {% endblock %}
