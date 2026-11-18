@@ -60,13 +60,15 @@ def customer_dashboard(request):
 
 @login_required
 def customer_order_history(request):
-    """Display orders belonging to the logged-in customer."""
+    """Display orders belonging only to the logged-in customer."""
 
     orders = (
         Order.objects
         .filter(user=request.user)
         .select_related("payment")
-        .prefetch_related("items__product")
+        .prefetch_related(
+            "items__product",
+        )
         .order_by("-created_at")
     )
 
@@ -79,18 +81,26 @@ def customer_order_history(request):
 
 @login_required
 def customer_order_detail(request, pk):
-    """Display an order only if it belongs to the logged-in customer."""
+    """Display an order and its tracking history securely."""
 
     order = get_object_or_404(
         Order.objects
         .filter(user=request.user)
         .select_related("payment")
-        .prefetch_related("items__product"),
+        .prefetch_related(
+            "items__product",
+            "status_history",
+        ),
         pk=pk,
     )
+
+    history = order.status_history.all().order_by("created_at")
 
     return render(
         request,
         "customers/order_detail.html",
-        {"order": order},
+        {
+            "order": order,
+            "history": history,
+        },
     )

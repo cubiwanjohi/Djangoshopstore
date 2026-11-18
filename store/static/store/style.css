@@ -1031,3 +1031,335 @@ a:focus-visible {
         padding: 1rem;
     }
 }
+
+
+/* =========================================
+   CUSTOMER ORDER TRACKING PORTAL
+========================================= */
+
+.customer-orders-page,
+.customer-tracking-page {
+    padding: 32px 0 50px;
+}
+
+.customer-orders-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 28px;
+}
+
+.customer-orders-heading h1 {
+    margin: 5px 0 8px;
+    color: #111827;
+    font-size: 2rem;
+}
+
+.customer-orders-heading p {
+    color: #6b7280;
+    margin: 0;
+}
+
+.customer-eyebrow {
+    color: #15803d !important;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.customer-order-list {
+    display: grid;
+    gap: 20px;
+}
+
+.customer-order-card,
+.customer-tracking-card,
+.customer-empty-orders {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.customer-order-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.customer-order-top h2 {
+    margin: 0 0 6px;
+    font-size: 1.2rem;
+}
+
+.customer-order-top p {
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.customer-order-summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    padding: 22px 0;
+    margin-top: 12px;
+    border-top: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.customer-order-summary div {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.customer-order-summary span {
+    color: #6b7280;
+    font-size: 0.85rem;
+}
+
+.customer-order-summary strong {
+    color: #111827;
+}
+
+.customer-order-progress {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: 28px 0;
+}
+
+.tracking-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    color: #9ca3af;
+    font-size: 0.82rem;
+    text-align: center;
+    min-width: 75px;
+}
+
+.tracking-dot {
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #d1d5db;
+    border: 3px solid #e5e7eb;
+}
+
+.tracking-stage.completed {
+    color: #166534;
+    font-weight: 700;
+}
+
+.tracking-stage.completed .tracking-dot {
+    background: #15803d;
+    border-color: #bbf7d0;
+}
+
+.tracking-line {
+    flex: 1;
+    height: 4px;
+    background: #e5e7eb;
+    margin: 0 5px 25px;
+    border-radius: 5px;
+}
+
+.tracking-line.completed {
+    background: #15803d;
+}
+
+.customer-tracking-number {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 12px 15px;
+    margin: 18px 0;
+    color: #166534;
+    overflow-wrap: anywhere;
+}
+
+.customer-order-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding-top: 18px;
+    border-top: 1px solid #e5e7eb;
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+.customer-primary-btn,
+.customer-secondary-btn {
+    display: inline-block;
+    padding: 11px 18px;
+    border-radius: 7px;
+    text-decoration: none;
+    font-weight: 600;
+    text-align: center;
+    transition: background 0.2s ease;
+}
+
+.customer-primary-btn {
+    background: #15803d;
+    color: #ffffff;
+}
+
+.customer-primary-btn:hover {
+    background: #166534;
+}
+
+.customer-secondary-btn {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.customer-secondary-btn:hover {
+    background: #e5e7eb;
+}
+
+.customer-empty-orders {
+    text-align: center;
+    padding: 45px 20px;
+}
+
+.customer-empty-orders p {
+    color: #6b7280;
+    margin-bottom: 22px;
+}
+
+/* Detailed tracking cards */
+
+.customer-tracking-card h2 {
+    font-size: 1.2rem;
+    margin: 0 0 22px;
+    color: #111827;
+}
+
+.customer-current-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+/* Order history timeline */
+
+.customer-history-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 15px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.customer-history-entry:last-child {
+    border-bottom: none;
+}
+
+.customer-history-dot {
+    width: 13px;
+    height: 13px;
+    flex-shrink: 0;
+    margin-top: 5px;
+    border-radius: 50%;
+    background: #15803d;
+}
+
+.customer-history-entry strong {
+    color: #166534;
+}
+
+.customer-history-entry p {
+    color: #6b7280;
+    margin: 6px 0 0;
+    font-size: 0.9rem;
+}
+
+/* Purchased products */
+
+.customer-product-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    padding: 16px 0;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.customer-product-row h3 {
+    margin: 0 0 6px;
+    font-size: 1rem;
+}
+
+.customer-product-row p {
+    color: #6b7280;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.customer-product-row > strong {
+    white-space: nowrap;
+}
+
+.customer-total-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    padding-top: 20px;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+/* Mobile responsiveness */
+
+@media (max-width: 650px) {
+    .customer-orders-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .customer-order-card,
+    .customer-tracking-card {
+        padding: 17px;
+    }
+
+    .customer-order-summary {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .customer-order-top {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .customer-order-footer {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .customer-order-progress {
+        margin: 22px 0;
+    }
+
+    .tracking-stage {
+        min-width: 55px;
+        font-size: 0.7rem;
+    }
+
+    .tracking-line {
+        margin-left: 2px;
+        margin-right: 2px;
+    }
+
+    .customer-product-row {
+        align-items: flex-start;
+    }
+}
