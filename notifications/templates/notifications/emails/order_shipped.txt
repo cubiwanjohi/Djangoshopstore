@@ -1,0 +1,18 @@
+Hello {{ order.customer_name }},
+
+Good news! Your ShopStore order has been dispatched.
+
+Order number: #{{ order.id }}
+
+{% if order.tracking_number %}
+Tracking number: {{ order.tracking_number }}
+{% else %}
+Your order has been dispatched. Please contact us if you need tracking assistance.
+{% endif %}
+
+Delivery address:
+{{ order.shipping_address }}, {{ order.shipping_city }}
+
+We will notify you when your order has been delivered.
+
+Thank you for shopping with ShopStore!

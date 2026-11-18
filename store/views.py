@@ -1,10 +1,10 @@
+
 """Storefront views: catalogue, cart, checkout and the M-Pesa callback."""
 
 import logging
 import re
 
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import F
@@ -17,9 +17,9 @@ from payments.services.mpesa import stk_push
 from inventory.models import StockMovement
 from inventory.services import record_stock_movement
 
-logger = logging.getLogger(__name__)
+from notifications.services import send_order_confirmation
 
-FROM_EMAIL = 'shop@example.com'
+logger = logging.getLogger(__name__)
 
 
 class OutOfStock(Exception):
@@ -37,6 +37,7 @@ class OutOfStock(Exception):
 def _normalize_phone(raw):
     """Return a Safaricom number as 2547XXXXXXXX / 2541XXXXXXXX, or None if invalid."""
     digits = re.sub(r'\D', '', raw or '')
+
     if digits.startswith('254') and len(digits) == 12:
         national = digits[3:]
     elif digits.startswith('0') and len(digits) == 10:
@@ -59,13 +60,16 @@ def _cart_lines(request):
     products = Product.objects.in_bulk(ids)
 
     lines, total = [], 0
+
     for pk, qty in cart.items():
         product = products.get(int(pk)) if str(pk).isdigit() else None
+
         if product is None:
             continue
 
         subtotal = product.price * qty
         total += subtotal
+
         lines.append({
             'product': product,
             'quantity': qty,
@@ -91,26 +95,28 @@ def _restore_stock(order):
         )
 
 
-def _send_email(subject, message, recipient):
-    """Send an email without ever breaking the request if the mail backend fails."""
-    try:
-        send_mail(subject, message, FROM_EMAIL, [recipient], fail_silently=False)
-    except Exception:
-        logger.exception('Failed to send email: %s', subject)
-
-
 # --------------------------------------------------------------------------
 # Catalogue
 # --------------------------------------------------------------------------
 
 def product_list(request):
     products = Product.objects.all()
-    return render(request, 'store/product_list.html', {'products': products})
+
+    return render(
+        request,
+        'store/product_list.html',
+        {'products': products},
+    )
 
 
 def product_detail(request, pk):
     product = get_object_or_404(Product, pk=pk)
-    return render(request, 'store/product_detail.html', {'product': product})
+
+    return render(
+        request,
+        'store/product_detail.html',
+        {'product': product},
+    )
 
 
 # --------------------------------------------------------------------------
@@ -132,10 +138,15 @@ def cart_add(request, pk):
 
 def cart_view(request):
     items, total = _cart_lines(request)
-    return render(request, 'store/cart.html', {
-        'items': items,
-        'total': total,
-    })
+
+    return render(
+        request,
+        'store/cart.html',
+        {
+            'items': items,
+            'total': total,
+        },
+    )
 
 
 # --------------------------------------------------------------------------
@@ -168,6 +179,7 @@ def checkout(request):
 
     if not all([name, email, address, city, phone]):
         error = 'Please fill in all the fields.'
+
     elif (
         len(name) > 200
         or len(address) > 255
@@ -175,8 +187,10 @@ def checkout(request):
         or len(phone) > 20
     ):
         error = 'One of the fields is too long.'
+
     elif mpesa_phone is None:
         error = 'Enter a valid Safaricom number, for example 0712345678.'
+
     else:
         try:
             validate_email(email)
@@ -262,8 +276,8 @@ def checkout(request):
             },
         )
 
-    # Ask Safaricom to prompt the customer. This network call runs
-    # outside the database transaction.
+    # Ask Safaricom to prompt the customer.
+    # This network call runs outside the database transaction.
     prompt_sent = False
     checkout_request_id = ''
 
@@ -304,27 +318,10 @@ def checkout(request):
 
     request.session['cart'] = {}
 
-    if prompt_sent:
-        payment_line = (
-            'Enter your M-Pesa PIN on your phone to complete the payment.'
-        )
-    else:
-        payment_line = (
-            'We could not start the M-Pesa payment. '
-            'Please contact us about this order.'
-        )
-
-    _send_email(
-        subject=f'Order #{order.id} received',
-        message=(
-            f'Hi {order.customer_name},\n\n'
-            f'Thanks for your order! Order #{order.id} '
-            f'total: KSh {order.total()}\n'
-            f'Delivery to: {order.shipping_address}, '
-            f'{order.shipping_city}\n\n'
-            f'{payment_line}'
-        ),
-        recipient=order.customer_email,
+    # Send order confirmation using the reusable notification service.
+    send_order_confirmation(
+        order_id=order.id,
+        payment_prompt_sent=prompt_sent,
     )
 
     return render(

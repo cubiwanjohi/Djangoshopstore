@@ -1,0 +1,16 @@
+Hello {{ order.customer_name }},
+
+Your M-Pesa payment has been successfully confirmed!
+
+Order number: #{{ order.id }}
+Amount paid: KSh {{ payment.amount }}
+M-Pesa receipt number: {{ payment.mpesa_receipt_number }}
+
+Delivery address:
+{{ order.shipping_address }}, {{ order.shipping_city }}
+
+Your order is now being processed.
+
+We will notify you when your order is dispatched.
+
+Thank you for shopping with ShopStore!
