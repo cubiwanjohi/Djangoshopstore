@@ -239,10 +239,10 @@ class CheckoutTests(TestCase):
         session["cart"] = {str(self.product.pk): 2}
         session.save()
 
-    @patch("store.views.send_mail")
+    @patch("store.views.send_order_confirmation")
     @patch("store.views.stk_push")
     def test_checkout_creates_order_and_payment(
-        self, mock_stk_push, mock_send_mail
+        self, mock_stk_push, mock_send_order_confirmation
     ):
         """Guest checkout should create an order without a user."""
 
@@ -285,12 +285,12 @@ class CheckoutTests(TestCase):
         self.assertEqual(self.client.session["cart"], {})
 
         mock_stk_push.assert_called_once()
-        mock_send_mail.assert_called_once()
+        mock_send_order_confirmation.assert_called_once()
 
-    @patch("store.views.send_mail")
+    @patch("store.views.send_order_confirmation")
     @patch("store.views.stk_push")
     def test_authenticated_checkout_links_order_to_customer(
-        self, mock_stk_push, mock_send_mail
+        self, mock_stk_push, mock_send_order_confirmation
     ):
         """Authenticated checkout should associate the order with the user."""
 
@@ -336,8 +336,7 @@ class CheckoutTests(TestCase):
         self.assertEqual(self.client.session["cart"], {})
 
         mock_stk_push.assert_called_once()
-        mock_send_mail.assert_called_once()
-
+        mock_send_order_confirmation.assert_called_once()
 
 class MpesaCallbackTests(TestCase):
     """Test successful and failed M-Pesa callbacks."""

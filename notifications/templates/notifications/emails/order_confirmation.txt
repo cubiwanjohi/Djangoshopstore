@@ -1,0 +1,25 @@
+Hello {{ order.customer_name }},
+
+Thank you for shopping with ShopStore!
+
+We have received your order.
+
+Order number: #{{ order.id }}
+Order total: KSh {{ order.total }}
+
+Delivery address:
+{{ order.shipping_address }}, {{ order.shipping_city }}
+
+{% if payment_prompt_sent %}
+Your M-Pesa payment request has been sent to your phone.
+
+Please enter your M-Pesa PIN to complete the payment.
+
+We will send you another notification once your payment is confirmed.
+{% else %}
+Unfortunately, we could not initiate your M-Pesa payment.
+
+Please contact ShopStore for assistance with your order.
+{% endif %}
+
+Thank you for choosing ShopStore!

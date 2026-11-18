@@ -4,7 +4,6 @@
 The M-Pesa network call (store.views.stk_push) is always mocked, so these tests
 never contact Safaricom and never move money.
 """
-
 import json
 from decimal import Decimal
 from unittest import mock
@@ -16,7 +15,6 @@ from django.urls import reverse
 from inventory.models import StockMovement
 from .models import Order, OrderItem, Payment, Product
 from .views import _normalize_phone
-
 
 STK_OK = {
     'ResponseCode': '0',
@@ -33,12 +31,10 @@ VALID_FORM = {
     'mpesa_phone': '0712345678',
 }
 
-
 def make_product(**overrides):
     values = {'name': 'Coffee', 'price': Decimal('300'), 'stock': 10}
     values.update(overrides)
     return Product.objects.create(**values)
-
 
 def put_in_cart(client, product, quantity=1):
     """Place a product in the client's session cart without going through the views."""
@@ -47,7 +43,6 @@ def put_in_cart(client, product, quantity=1):
     cart[str(product.pk)] = quantity
     session['cart'] = cart
     session.save()
-
 
 # --------------------------------------------------------------------------
 # Helpers and models
@@ -84,7 +79,6 @@ class NormalizePhoneTests(SimpleTestCase):
             with self.subTest(raw=raw):
                 self.assertIsNone(_normalize_phone(raw))
 
-
 class OrderModelTests(TestCase):
     def test_total_sums_price_times_quantity_for_every_item(self):
         order = Order.objects.create(
@@ -113,7 +107,6 @@ class OrderModelTests(TestCase):
         )
 
         self.assertEqual(order.total(), Decimal('750'))
-
 
 # --------------------------------------------------------------------------
 # Catalogue
@@ -148,7 +141,6 @@ class CatalogueTests(TestCase):
         response = self.client.get(reverse('product_list'))
 
         self.assertEqual(response.context['cart_count'], 2)
-
 
 # --------------------------------------------------------------------------
 # Cart
@@ -222,7 +214,6 @@ class CartTests(TestCase):
 
         self.assertEqual(response.context['items'], [])
         self.assertContains(response, 'Your cart is empty')
-
 
 # --------------------------------------------------------------------------
 # Checkout
@@ -570,7 +561,6 @@ class CheckoutTests(TestCase):
             1,
         )
 
-
 # --------------------------------------------------------------------------
 # M-Pesa callback
 # --------------------------------------------------------------------------
@@ -733,13 +723,23 @@ class MpesaCallbackTests(TestCase):
         self.assertEqual(self.payment.mpesa_receipt_number, '')
         self.assertEqual(len(mail.outbox), 0)
 
-
     def test_successful_payment_emails_the_customer(self):
-        self.post_json(callback_payload(result_code=0))
+        with self.captureOnCommitCallbacks(execute=True):
+            self.post_json(callback_payload(result_code=0))
 
         self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, ['jane@example.com'])
-        self.assertIn('Payment received', mail.outbox[0].subject)
+        self.assertEqual(
+            mail.outbox[0].to,
+            ['jane@example.com'],
+        )
+        self.assertIn(
+            'Payment confirmed',
+            mail.outbox[0].subject,
+        )
+        self.assertIn(
+            'QGH123ABC',
+            mail.outbox[0].body,
+        )
 
     # --- failure ---
 
@@ -767,8 +767,9 @@ class MpesaCallbackTests(TestCase):
     # --- repeated callbacks ---
 
     def test_repeated_success_callback_is_processed_once(self):
-        self.post_json(callback_payload(result_code=0))
-        response = self.post_json(callback_payload(result_code=0))
+        with self.captureOnCommitCallbacks(execute=True):
+            self.post_json(callback_payload(result_code=0))
+            response = self.post_json(callback_payload(result_code=0))
 
         self.assertEqual(response.status_code, 200)
 
@@ -785,6 +786,7 @@ class MpesaCallbackTests(TestCase):
             ).count(),
             0,
         )
+
 
     def test_a_late_failure_cannot_undo_a_completed_payment(self):
         self.post_json(callback_payload(result_code=0))

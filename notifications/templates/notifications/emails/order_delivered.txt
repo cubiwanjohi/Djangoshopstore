@@ -1,0 +1,14 @@
+Hello {{ order.customer_name }},
+
+Your ShopStore order has been successfully delivered!
+
+Order number: #{{ order.id }}
+
+Delivery address:
+{{ order.shipping_address }}, {{ order.shipping_city }}
+
+We hope you enjoy your purchase.
+
+Thank you for choosing ShopStore. We look forward to serving you again!
+
+ShopStore Team
