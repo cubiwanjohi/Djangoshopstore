@@ -7,7 +7,7 @@ import re
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
-from django.db.models import F
+from django.db.models import Avg, Count, F
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -16,6 +16,7 @@ from payments.services.mpesa import stk_push
 
 from inventory.models import StockMovement
 from inventory.services import record_stock_movement
+from reviews.models import Review
 
 from notifications.services import send_order_confirmation
 
@@ -108,17 +109,48 @@ def product_list(request):
         {'products': products},
     )
 
-
 def product_detail(request, pk):
     product = get_object_or_404(Product, pk=pk)
 
-    return render(
-        request,
-        'store/product_detail.html',
-        {'product': product},
+    reviews = (
+        Review.objects
+        .filter(product=product)
+        .select_related("user")
     )
 
+    rating_summary = reviews.aggregate(
+        average_rating=Avg("rating"),
+        review_count=Count("id"),
+    )
 
+    existing_review = None
+    has_purchased = False
+
+    if request.user.is_authenticated:
+        existing_review = reviews.filter(
+            user=request.user,
+        ).first()
+
+        has_purchased = Order.objects.filter(
+            user=request.user,
+            status="paid",
+            items__product=product,
+        ).exists()
+
+    context = {
+        "product": product,
+        "reviews": reviews,
+        "average_rating": rating_summary["average_rating"],
+        "review_count": rating_summary["review_count"],
+        "existing_review": existing_review,
+        "has_purchased": has_purchased,
+    }
+
+    return render(
+        request,
+        "store/product_detail.html",
+        context,
+    )
 # --------------------------------------------------------------------------
 # Cart
 # --------------------------------------------------------------------------
@@ -148,6 +180,18 @@ def cart_view(request):
         },
     )
 
+
+@require_POST
+def cart_remove(request, pk):
+    """Remove one product from the customer's session cart."""
+    cart = request.session.get('cart', {})
+    key = str(pk)
+
+    if key in cart:
+        del cart[key]
+        request.session['cart'] = cart
+
+    return redirect('cart_view')
 
 # --------------------------------------------------------------------------
 # Checkout

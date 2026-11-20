@@ -1,9 +1,12 @@
+
 {% extends 'store/base.html' %}
 
 {% block title %}{{ product.name }} &middot; ShopStore{% endblock %}
 
 {% block content %}
-<p class="breadcrumb"><a href="{% url 'product_list' %}">&larr; Back to shop</a></p>
+<p class="breadcrumb">
+    <a href="{% url 'product_list' %}">&larr; Back to shop</a>
+</p>
 
 <article class="detail">
     <div class="detail-media">
@@ -16,7 +19,19 @@
 
     <div class="detail-info">
         <h1>{{ product.name }}</h1>
-        <div class="price price-lg">KSh {{ product.price|floatformat:"-2g" }}</div>
+
+        <div class="price price-lg">
+            KSh {{ product.price|floatformat:"-2g" }}
+        </div>
+
+        <p class="muted">
+            {% if review_count %}
+                {{ average_rating|floatformat:1 }}/5
+                ({{ review_count }} review{{ review_count|pluralize }})
+            {% else %}
+                No reviews yet
+            {% endif %}
+        </p>
 
         {% if product.stock == 0 %}
             <div class="stock out">Out of stock</div>
@@ -27,19 +42,103 @@
         {% endif %}
 
         {% if product.description %}
-        <p class="description">{{ product.description|linebreaksbr }}</p>
+            <p class="description">
+                {{ product.description|linebreaksbr }}
+            </p>
         {% endif %}
 
         {% if product.stock > 0 %}
-        <form action="{% url 'cart_add' product.pk %}" method="post">
-            {% csrf_token %}
-            <button class="btn" type="submit">Add to cart</button>
-        </form>
+            <form action="{% url 'cart_add' product.pk %}" method="post">
+                {% csrf_token %}
+                <button class="btn" type="submit">Add to cart</button>
+            </form>
         {% else %}
-        <button class="btn" type="button" disabled>Out of stock</button>
+            <button class="btn" type="button" disabled>
+                Out of stock
+            </button>
         {% endif %}
 
         <p class="muted small">Pay with M-Pesa at checkout.</p>
     </div>
 </article>
+
+<hr>
+
+<section class="reviews-section">
+    <h2>Customer Reviews</h2>
+
+    {% if review_count %}
+        <p>
+            Average rating:
+            <strong>{{ average_rating|floatformat:1 }}/5</strong>
+            from {{ review_count }} review{{ review_count|pluralize }}.
+        </p>
+    {% else %}
+        <p class="muted">No customer reviews yet. Be the first!</p>
+    {% endif %}
+
+    {% if user.is_authenticated %}
+        {% if existing_review %}
+            <p>You have reviewed this product.</p>
+
+            <p>
+                <a class="btn" href="{% url 'reviews:edit_review' existing_review.pk %}">
+                    Edit your review
+                </a>
+            </p>
+
+            <form
+                method="post"
+                action="{% url 'reviews:delete_review' existing_review.pk %}"
+                onsubmit="return confirm('Are you sure you want to delete your review?');"
+            >
+                {% csrf_token %}
+                <button class="btn" type="submit">Delete your review</button>
+            </form>
+
+        {% elif has_purchased %}
+            <p>
+                <a class="btn" href="{% url 'reviews:create_review' product.pk %}">
+                    Write a review
+                </a>
+            </p>
+        {% else %}
+            <p class="muted">
+                You must purchase and pay for this product before reviewing it.
+            </p>
+        {% endif %}
+    {% else %}
+        <p class="muted">
+            Sign in and purchase this product to leave a review.
+        </p>
+    {% endif %}
+
+    <div class="review-list">
+        {% for review in reviews %}
+            <article class="review-card">
+                <h3>{{ review.title }}</h3>
+
+                <p>
+                    <strong>{{ review.rating }}/5</strong>
+                    &middot;
+                    <span class="muted">
+                        {{ review.user.get_username }}
+                    </span>
+                </p>
+
+                <p>{{ review.comment|linebreaksbr }}</p>
+
+                <p class="muted small">
+                    Posted {{ review.created_at|date:"d M Y" }}
+
+                    {% if review.updated_at != review.created_at %}
+                        (updated)
+                    {% endif %}
+                </p>
+            </article>
+        {% empty %}
+            <p class="muted">Be the first customer to review this product.</p>
+        {% endfor %}
+    </div>
+</section>
 {% endblock %}
