@@ -22,6 +22,9 @@ urlpatterns = [
 
     # Order fulfilment management
     path("orders/", include("orders.urls")),
+
+    # Product reviews
+    path("reviews/", include("reviews.urls")),
 ]
 
 

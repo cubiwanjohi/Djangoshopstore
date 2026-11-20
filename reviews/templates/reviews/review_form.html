@@ -1,0 +1,49 @@
+
+{% extends "store/base.html" %}
+
+{% block title %}{{ page_title }} · ShopStore{% endblock %}
+
+{% block content %}
+<div class="form-container">
+    <p class="breadcrumb">
+        <a href="{% url 'product_detail' product.pk %}">
+            &larr; Back to {{ product.name }}
+        </a>
+    </p>
+
+    <h1>{{ page_title }}</h1>
+    <p class="muted">Product: {{ product.name }}</p>
+
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="error-message">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <div class="form-group">
+            <label for="{{ form.rating.id_for_label }}">Rating</label>
+            {{ form.rating }}
+            {{ form.rating.errors }}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.title.id_for_label }}">Review title</label>
+            {{ form.title }}
+            {{ form.title.errors }}
+        </div>
+
+        <div class="form-group">
+            <label for="{{ form.comment.id_for_label }}">Your review</label>
+            {{ form.comment }}
+            {{ form.comment.errors }}
+        </div>
+
+        <button class="btn" type="submit">
+            {% if review %}Update review{% else %}Submit review{% endif %}
+        </button>
+    </form>
+</div>
+{% endblock %}

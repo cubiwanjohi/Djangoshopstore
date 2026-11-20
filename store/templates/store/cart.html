@@ -1,3 +1,4 @@
+
 {% extends 'store/base.html' %}
 
 {% block title %}Your cart &middot; ShopStore{% endblock %}
@@ -17,23 +18,47 @@
                     <div class="placeholder small">{{ item.product.name|first|upper }}</div>
                 {% endif %}
             </a>
+
             <div class="line-info">
-                <a class="line-name" href="{% url 'product_detail' item.product.pk %}">{{ item.product.name }}</a>
-                <div class="muted small">KSh {{ item.product.price|floatformat:"-2g" }} each &middot; Qty {{ item.quantity }}</div>
+                <a class="line-name" href="{% url 'product_detail' item.product.pk %}">
+                    {{ item.product.name }}
+                </a>
+
+                <div class="muted small">
+                    KSh {{ item.product.price|floatformat:"-2g" }} each
+                    &middot; Qty {{ item.quantity }}
+                </div>
+
+                <form method="post" action="{% url 'cart_remove' item.product.pk %}">
+                    {% csrf_token %}
+                    <button class="btn btn-outline" type="submit">
+                        Remove
+                    </button>
+                </form>
             </div>
-            <div class="line-total">KSh {{ item.subtotal|floatformat:"-2g" }}</div>
+
+            <div class="line-total">
+                KSh {{ item.subtotal|floatformat:"-2g" }}
+            </div>
         </div>
         {% endfor %}
     </div>
 
     <aside class="summary">
         <h2>Order summary</h2>
+
         <div class="summary-total">
             <span>Total</span>
             <span>KSh {{ total|floatformat:"-2g" }}</span>
         </div>
-        <a class="btn btn-block" href="{% url 'checkout' %}">Proceed to checkout</a>
-        <a class="btn btn-outline btn-block" href="{% url 'product_list' %}">Continue shopping</a>
+
+        <a class="btn btn-block" href="{% url 'checkout' %}">
+            Proceed to checkout
+        </a>
+
+        <a class="btn btn-outline btn-block" href="{% url 'product_list' %}">
+            Continue shopping
+        </a>
     </aside>
 </div>
 {% else %}

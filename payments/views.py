@@ -53,7 +53,7 @@ def _extract_callback_payment_details(callback):
     except (InvalidOperation, TypeError, ValueError):
         return None, ""
 
-    if not amount.is_finite():
+    if not amount.is_finite() or amount < 0:
         return None, ""
 
     receipt = (
@@ -89,41 +89,94 @@ def _restore_payment_stock(order):
 def mpesa_callback(request):
     """Process Safaricom's asynchronous STK Push callback."""
 
+    # ---------------------------------------------------------
+    # 1. Validate and extract callback payload
+    # ---------------------------------------------------------
     try:
-        callback = json.loads(request.body)["Body"]["stkCallback"]
-        checkout_request_id = callback["CheckoutRequestID"]
-        result_code = int(callback["ResultCode"])
+        payload = json.loads(request.body)
 
-    except (ValueError, KeyError, TypeError):
+        if not isinstance(payload, dict):
+            raise ValueError("Invalid callback payload structure")
+
+        body = payload.get("Body")
+
+        if not isinstance(body, dict):
+            raise ValueError("Invalid callback Body")
+
+        callback = body.get("stkCallback")
+
+        if not isinstance(callback, dict):
+            raise ValueError("Invalid stkCallback")
+
+        checkout_request_id = callback.get("CheckoutRequestID")
+
+        if not isinstance(checkout_request_id, str):
+            raise ValueError("Missing CheckoutRequestID")
+
+        checkout_request_id = checkout_request_id.strip()
+
+        if not checkout_request_id:
+            raise ValueError("Empty CheckoutRequestID")
+
+        raw_result_code = callback.get("ResultCode")
+
+        if isinstance(raw_result_code, bool):
+            raise ValueError("Invalid ResultCode")
+
+        if not isinstance(raw_result_code, (int, str)):
+            raise ValueError("Invalid ResultCode")
+
+        result_code = int(raw_result_code)
+
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError):
         logger.warning("Malformed M-Pesa callback received")
+
         return JsonResponse(
-            {"ResultCode": 1, "ResultDesc": "Invalid payload"},
+            {
+                "ResultCode": 1,
+                "ResultDesc": "Invalid payload",
+            },
             status=400,
         )
 
+    # ---------------------------------------------------------
+    # 2. Lock payment and process callback atomically
+    # ---------------------------------------------------------
     with transaction.atomic():
+
         payment = (
             Payment.objects.select_for_update()
             .filter(transaction_id=checkout_request_id)
             .first()
         )
 
+        # -----------------------------------------------------
+        # 3. Handle unknown payment
+        # -----------------------------------------------------
         if payment is None:
             logger.warning(
                 "M-Pesa callback for unknown CheckoutRequestID"
             )
 
+        # -----------------------------------------------------
+        # 4. Prevent duplicate processing
+        # -----------------------------------------------------
         elif payment.status != "pending":
             logger.info(
                 "Ignoring repeated callback for payment %s",
                 payment.pk,
             )
 
+        # -----------------------------------------------------
+        # 5. Handle successful payment
+        # -----------------------------------------------------
         elif result_code == 0:
+
             callback_amount, receipt_number = (
                 _extract_callback_payment_details(callback)
             )
 
+            # Reject success callbacks with missing information.
             if callback_amount is None or not receipt_number:
                 logger.warning(
                     "M-Pesa success callback missing valid amount "
@@ -131,6 +184,7 @@ def mpesa_callback(request):
                     payment.pk,
                 )
 
+            # Prevent incorrect amounts from completing an order.
             elif callback_amount != payment.amount:
                 logger.warning(
                     "M-Pesa amount mismatch for payment %s: "
@@ -140,9 +194,11 @@ def mpesa_callback(request):
                     callback_amount,
                 )
 
+            # Complete payment and order.
             else:
                 payment.status = "completed"
                 payment.mpesa_receipt_number = receipt_number
+
                 payment.save(
                     update_fields=[
                         "status",
@@ -151,20 +207,36 @@ def mpesa_callback(request):
                 )
 
                 payment.order.status = "paid"
-                payment.order.save(update_fields=["status"])
 
-                # Send the payment confirmation only after the
-                # successful database transaction has committed.
+                payment.order.save(
+                    update_fields=["status"]
+                )
+
+                # Send confirmation only after transaction commits.
                 transaction.on_commit(
                     lambda order_id=payment.order_id:
                         send_payment_confirmation(order_id)
                 )
 
+        # -----------------------------------------------------
+        # 6. Handle failed payment
+        # -----------------------------------------------------
         else:
             payment.status = "failed"
-            payment.save(update_fields=["status"])
+
+            payment.save(
+                update_fields=["status"]
+            )
+
+            # Return stock previously reserved during checkout.
             _restore_payment_stock(payment.order)
 
+    # ---------------------------------------------------------
+    # 7. Acknowledge callback
+    # ---------------------------------------------------------
     return JsonResponse(
-        {"ResultCode": 0, "ResultDesc": "Accepted"}
+        {
+            "ResultCode": 0,
+            "ResultDesc": "Accepted",
+        }
     )
