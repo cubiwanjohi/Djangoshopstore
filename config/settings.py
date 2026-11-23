@@ -14,6 +14,7 @@ from pathlib import Path
 import os
 
 from dotenv import load_dotenv
+import dj_database_url
 
 
 # ============================================================
@@ -68,6 +69,41 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+# ============================================================
+# PRODUCTION SECURITY
+# ============================================================
+
+# Railway runs Django behind an HTTPS reverse proxy.
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https",
+)
+
+# Enable these through environment variables in production.
+SECURE_SSL_REDIRECT = os.environ.get(
+    "SECURE_SSL_REDIRECT",
+    "False"
+).lower() == "true"
+
+SESSION_COOKIE_SECURE = os.environ.get(
+    "SESSION_COOKIE_SECURE",
+    "False"
+).lower() == "true"
+
+CSRF_COOKIE_SECURE = os.environ.get(
+    "CSRF_COOKIE_SECURE",
+    "False"
+).lower() == "true"
+
+# Trusted HTTPS origins, separated by commas.
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "CSRF_TRUSTED_ORIGINS",
+        ""
+    ).split(",")
+    if origin.strip()
+]
 
 # ============================================================
 # APPLICATIONS
@@ -139,22 +175,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-
 # ============================================================
-# DATABASE
+# DATABASE CONFIGURATION
 # ============================================================
-
-# USE_SQLITE=True
-#     Uses SQLite for local development.
-#
-# USE_SQLITE=False
-#     Uses PostgreSQL, normally when running with Docker.
 
 USE_SQLITE = os.environ.get(
     "USE_SQLITE",
     "True"
 ).lower() == "true"
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if USE_SQLITE:
 
@@ -165,34 +195,30 @@ if USE_SQLITE:
         }
     }
 
+elif DATABASE_URL:
+
+    # Railway PostgreSQL
+    DATABASES = {
+        "default": dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
+
 else:
 
+    # Local Docker PostgreSQL
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get(
-                "POSTGRES_DB",
-                "shopdb"
-            ),
-            "USER": os.environ.get(
-                "POSTGRES_USER",
-                "shopuser"
-            ),
-            "PASSWORD": os.environ.get(
-                "POSTGRES_PASSWORD",
-                "shoppass"
-            ),
-            "HOST": os.environ.get(
-                "POSTGRES_HOST",
-                "db"
-            ),
-            "PORT": os.environ.get(
-                "POSTGRES_PORT",
-                "5432"
-            ),
+            "NAME": os.environ.get("POSTGRES_DB", "shopdb"),
+            "USER": os.environ.get("POSTGRES_USER", "shopuser"),
+            "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "shoppass"),
+            "HOST": os.environ.get("POSTGRES_HOST", "db"),
+            "PORT": os.environ.get("POSTGRES_PORT", "5432"),
         }
     }
-
 
 # ============================================================
 # PASSWORD VALIDATION
@@ -234,7 +260,6 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # ============================================================
 # STATIC FILES
 # ============================================================
@@ -242,12 +267,21 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# WhiteNoise production static-file storage
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": (
+            "whitenoise.storage."
+            "CompressedManifestStaticFilesStorage"
+        ),
+    },
+}
 
 # ============================================================
 # MEDIA FILES
 # ============================================================
 
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 
 MEDIA_ROOT = BASE_DIR / "media"
 
@@ -287,18 +321,37 @@ MPESA_BASE_URL = os.environ.get(
     "https://sandbox.safaricom.co.ke"
 )
 
-
 # ============================================================
-# EMAIL
+# EMAIL CONFIGURATION
 # ============================================================
 
-# During development, emails are printed
-# in the terminal instead of being sent.
-
-EMAIL_BACKEND = (
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
     "django.core.mail.backends.console.EmailBackend"
 )
 
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+
+EMAIL_USE_TLS = os.environ.get(
+    "EMAIL_USE_TLS",
+    "True"
+).lower() == "true"
+
+EMAIL_USE_SSL = os.environ.get(
+    "EMAIL_USE_SSL",
+    "False"
+).lower() == "true"
+
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+
+DEFAULT_FROM_EMAIL = os.environ.get(
+    "DEFAULT_FROM_EMAIL",
+    "ShopStore <petercubi01@gmail.com>"
+)
+
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # ============================================================
 # DEFAULT PRIMARY KEY

@@ -1,11 +1,13 @@
-@'
 venv/
 .venv/
 __pycache__/
 *.py[cod]
 .git/
 .env
+.env.*
+!.env.example
 db.sqlite3
+*.sqlite3
 staticfiles/
 media/
-'@ | Set-Content -Encoding ascii .dockerignore
+.pytest_cache/
