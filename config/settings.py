@@ -270,7 +270,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # WhiteNoise static files and uploaded media storage
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": "config.cloudinary_storage.CloudinaryMediaStorage",
     },
     "staticfiles": {
         "BACKEND": (
