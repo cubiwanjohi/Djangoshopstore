@@ -1,23 +1,23 @@
-
 """Storefront views: catalogue, cart, checkout and the M-Pesa callback."""
 
 import logging
 import re
 
+from django.core import signing
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models import Avg, Count, F
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from inventory.services import restore_reserved_stock
 from .models import Order, OrderItem, Payment, Product
 from payments.services.mpesa import stk_push
-
 from inventory.models import StockMovement
 from inventory.services import record_stock_movement
 from reviews.models import Review
-
 from notifications.services import send_order_confirmation
 
 logger = logging.getLogger(__name__)
@@ -79,22 +79,12 @@ def _cart_lines(request):
 
     return lines, total
 
-
 def _restore_stock(order):
-    """Return reserved stock and record the returned movements."""
-    for item in order.items.select_related('product'):
-        Product.objects.filter(pk=item.product_id).update(
-            stock=F('stock') + item.quantity
-        )
-
-        record_stock_movement(
-            product=item.product,
-            order=order,
-            movement_type=StockMovement.MovementType.RETURNED,
-            quantity=item.quantity,
-            note="Stock returned after M-Pesa STK Push failure",
-        )
-
+    """Return outstanding stock reservations after STK Push failure."""
+    return restore_reserved_stock(
+        order=order,
+        note="Stock returned after M-Pesa STK Push failure",
+    )
 
 # --------------------------------------------------------------------------
 # Catalogue
@@ -108,6 +98,7 @@ def product_list(request):
         'store/product_list.html',
         {'products': products},
     )
+
 
 def product_detail(request, pk):
     product = get_object_or_404(Product, pk=pk)
@@ -151,6 +142,8 @@ def product_detail(request, pk):
         "store/product_detail.html",
         context,
     )
+
+
 # --------------------------------------------------------------------------
 # Cart
 # --------------------------------------------------------------------------
@@ -192,6 +185,7 @@ def cart_remove(request, pk):
         request.session['cart'] = cart
 
     return redirect('cart_view')
+
 
 # --------------------------------------------------------------------------
 # Checkout
@@ -368,6 +362,11 @@ def checkout(request):
         payment_prompt_sent=prompt_sent,
     )
 
+    payment_token = signing.dumps(
+        {'order_id': order.pk},
+        salt='payments.order-status',
+    )
+
     return render(
         request,
         'store/order_success.html',
@@ -375,10 +374,9 @@ def checkout(request):
             'order': order,
             'payment': payment,
             'payment_prompt_sent': prompt_sent,
+            'payment_status_url': reverse(
+                'payment_status',
+                args=[payment_token],
+            ),
         },
     )
-
-
-# --------------------------------------------------------------------------
-# M-Pesa callback
-# --------------------------------------------------------------------------

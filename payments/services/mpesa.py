@@ -1,8 +1,31 @@
 
 import base64
-import requests
 from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import requests
 from django.conf import settings
+
+
+EAT = ZoneInfo("Africa/Nairobi")
+
+
+def generate_timestamp():
+    """Generate a Daraja timestamp in East Africa Time."""
+    return datetime.now(EAT).strftime("%Y%m%d%H%M%S")
+
+
+def generate_password(timestamp):
+    """Generate the Daraja Base64 password."""
+    raw_password = (
+        f"{settings.MPESA_SHORTCODE}"
+        f"{settings.MPESA_PASSKEY}"
+        f"{timestamp}"
+    )
+
+    return base64.b64encode(
+        raw_password.encode("utf-8")
+    ).decode("utf-8")
 
 
 def get_access_token():
@@ -21,19 +44,14 @@ def get_access_token():
     )
 
     response.raise_for_status()
-    return response.json()['access_token']
+    return response.json()["access_token"]
 
 
 def stk_push(phone_number, amount, account_reference, transaction_desc):
     access_token = get_access_token()
 
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-
-    password = base64.b64encode(
-        f"{settings.MPESA_SHORTCODE}"
-        f"{settings.MPESA_PASSKEY}"
-        f"{timestamp}".encode()
-    ).decode()
+    timestamp = generate_timestamp()
+    password = generate_password(timestamp)
 
     url = (
         f"{settings.MPESA_BASE_URL}"
@@ -70,19 +88,12 @@ def stk_push(phone_number, amount, account_reference, transaction_desc):
 
 
 def stk_push_query(checkout_request_id):
-    """
-    Check the status of an STK Push transaction using its CheckoutRequestID.
-    """
+    """Query an STK Push transaction using its CheckoutRequestID."""
 
     access_token = get_access_token()
 
-    timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-
-    password = base64.b64encode(
-        f"{settings.MPESA_SHORTCODE}"
-        f"{settings.MPESA_PASSKEY}"
-        f"{timestamp}".encode()
-    ).decode()
+    timestamp = generate_timestamp()
+    password = generate_password(timestamp)
 
     url = (
         f"{settings.MPESA_BASE_URL}"

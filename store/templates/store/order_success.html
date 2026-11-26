@@ -1,3 +1,4 @@
+
 {% extends 'store/base.html' %}
 
 {% block title %}Order #{{ order.id }} &middot; ShopStore{% endblock %}
@@ -7,30 +8,50 @@
     <h1>Thank you, {{ order.customer_name }}!</h1>
     <p class="muted">Order #{{ order.id }} has been received.</p>
 
-    {% if payment_prompt_sent %}
-    <div class="notice">
-        <h2>Complete your payment on your phone</h2>
-        <p>We sent an M-Pesa prompt to <strong>{{ payment.mpesa_phone }}</strong>. Enter your M-Pesa PIN to finish paying. Your order is confirmed once the payment is received.</p>
+    <div id="payment-status"
+         class="notice"
+         data-status-url="{{ payment_status_url }}">
+
+        {% if payment.status == 'completed' %}
+            <h2>Payment successful</h2>
+            <p>Your M-Pesa payment has been received. Your order is confirmed.</p>
+
+        {% elif payment.status == 'failed' %}
+            <h2>Payment failed or cancelled</h2>
+            <p>Your M-Pesa payment was not completed. Your order has not been paid.</p>
+
+        {% elif payment_prompt_sent %}
+            <h2>Waiting for M-Pesa payment</h2>
+            <p>
+                We sent an M-Pesa prompt to
+                <strong>{{ payment.mpesa_phone }}</strong>.
+                Enter your M-Pesa PIN to complete payment.
+            </p>
+            <p id="payment-check-message" class="muted">
+                Checking your payment status...
+            </p>
+
+        {% else %}
+            <h2>We could not start the M-Pesa payment</h2>
+            <p>Your payment request could not be started. Please contact us and quote order #{{ order.id }}.</p>
+        {% endif %}
     </div>
-    {% else %}
-    <div class="notice warn">
-        <h2>We could not start the M-Pesa payment</h2>
-        <p>Your order was not charged. Please contact us and quote order #{{ order.id }}.</p>
-    </div>
-    {% endif %}
 
     <section class="card-box">
         <h2>Your order</h2>
+
         {% for item in order.items.all %}
         <div class="summary-row">
             <span>{{ item.product.name }} &times; {{ item.quantity }}</span>
             <span>KSh {{ item.subtotal|floatformat:"-2g" }}</span>
         </div>
         {% endfor %}
+
         <div class="summary-total">
             <span>Total</span>
             <span>KSh {{ order.total|floatformat:"-2g" }}</span>
         </div>
+
         <p class="muted small">
             Delivery to {{ order.shipping_address }}, {{ order.shipping_city }}<br>
             Updates will be sent to {{ order.customer_email }}
@@ -41,4 +62,72 @@
         <a class="btn" href="{% url 'product_list' %}">Continue shopping</a>
     </div>
 </div>
+
+{% if payment_prompt_sent and payment.status == 'pending' %}
+<script>
+(function () {
+    const container = document.getElementById('payment-status');
+    const message = document.getElementById('payment-check-message');
+    const statusUrl = container.dataset.statusUrl;
+
+    function updatePaymentStatus(status) {
+        if (status === 'completed') {
+            container.className = 'notice';
+            container.innerHTML = `
+                <h2>Payment successful</h2>
+                <p>Your M-Pesa payment has been received. Your order is confirmed.</p>
+            `;
+            return true;
+        }
+
+        if (status === 'failed') {
+            container.className = 'notice warn';
+            container.innerHTML = `
+                <h2>Payment failed or cancelled</h2>
+                <p>Your M-Pesa payment was not completed. Your order has not been paid.</p>
+                <p>Please contact us if you need help completing your payment.</p>
+            `;
+            return true;
+        }
+
+        return false;
+    }
+
+    async function checkPayment() {
+        try {
+            const response = await fetch(statusUrl, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                cache: 'no-store'
+            });
+
+            if (!response.ok) {
+                message.textContent =
+                    'Unable to check payment status. Please refresh the page.';
+                return;
+            }
+
+            const data = await response.json();
+
+            if (updatePaymentStatus(data.status)) {
+                return;
+            }
+
+            message.textContent =
+                'Your payment is still pending. We will keep checking.';
+        } catch (error) {
+            message.textContent =
+                'Connection interrupted. Retrying payment status check...';
+        }
+
+        window.setTimeout(checkPayment, 5000);
+    }
+
+    window.setTimeout(checkPayment, 5000);
+})();
+</script>
+{% endif %}
+
 {% endblock %}

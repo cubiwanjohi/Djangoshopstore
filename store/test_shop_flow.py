@@ -1,12 +1,17 @@
-
 """Automated tests for the storefront: catalogue, cart, checkout and M-Pesa callback.
 
-The M-Pesa network call (store.views.stk_push) is always mocked, so these tests
-never contact Safaricom and never move money.
+All M-Pesa network calls are mocked:
+- store.views.stk_push
+- payments.views.stk_push_query
+
+These tests never contact Safaricom and never move money.
 """
+
 import json
 from decimal import Decimal
 from unittest import mock
+
+from requests.exceptions import Timeout
 
 from django.core import mail
 from django.test import Client, SimpleTestCase, TestCase
@@ -15,6 +20,7 @@ from django.urls import reverse
 from inventory.models import StockMovement
 from .models import Order, OrderItem, Payment, Product
 from .views import _normalize_phone
+
 
 STK_OK = {
     'ResponseCode': '0',
@@ -31,10 +37,16 @@ VALID_FORM = {
     'mpesa_phone': '0712345678',
 }
 
+
 def make_product(**overrides):
-    values = {'name': 'Coffee', 'price': Decimal('300'), 'stock': 10}
+    values = {
+        'name': 'Coffee',
+        'price': Decimal('300'),
+        'stock': 10,
+    }
     values.update(overrides)
     return Product.objects.create(**values)
+
 
 def put_in_cart(client, product, quantity=1):
     """Place a product in the client's session cart without going through the views."""
@@ -43,6 +55,7 @@ def put_in_cart(client, product, quantity=1):
     cart[str(product.pk)] = quantity
     session['cart'] = cart
     session.save()
+
 
 # --------------------------------------------------------------------------
 # Helpers and models
@@ -79,6 +92,7 @@ class NormalizePhoneTests(SimpleTestCase):
             with self.subTest(raw=raw):
                 self.assertIsNone(_normalize_phone(raw))
 
+
 class OrderModelTests(TestCase):
     def test_total_sums_price_times_quantity_for_every_item(self):
         order = Order.objects.create(
@@ -107,6 +121,7 @@ class OrderModelTests(TestCase):
         )
 
         self.assertEqual(order.total(), Decimal('750'))
+
 
 # --------------------------------------------------------------------------
 # Catalogue
@@ -141,6 +156,7 @@ class CatalogueTests(TestCase):
         response = self.client.get(reverse('product_list'))
 
         self.assertEqual(response.context['cart_count'], 2)
+
 
 # --------------------------------------------------------------------------
 # Cart
@@ -214,6 +230,7 @@ class CartTests(TestCase):
 
         self.assertEqual(response.context['items'], [])
         self.assertContains(response, 'Your cart is empty')
+
 
 # --------------------------------------------------------------------------
 # Checkout
@@ -496,7 +513,7 @@ class CheckoutTests(TestCase):
         self.assertEqual(payment.status, 'failed')
         self.assertEqual(payment.transaction_id, '')
         self.assertFalse(response.context['payment_prompt_sent'])
-        self.assertContains(response, 'could not start the M-Pesa payment')
+        self.assertContains(response, 'Payment failed or cancelled')
 
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 10)
@@ -561,6 +578,7 @@ class CheckoutTests(TestCase):
             1,
         )
 
+
 # --------------------------------------------------------------------------
 # M-Pesa callback
 # --------------------------------------------------------------------------
@@ -591,6 +609,7 @@ def callback_payload(
             'stkCallback': stk_callback,
         }
     }
+
 
 class MpesaCallbackTests(TestCase):
     def setUp(self):
@@ -631,6 +650,22 @@ class MpesaCallbackTests(TestCase):
 
         self.url = reverse('mpesa_callback')
 
+        # Mock Safaricom STK Push Query.
+        # These tests must never contact the real Safaricom API.
+        self.query_patcher = mock.patch(
+            'payments.views.stk_push_query'
+        )
+        self.mock_stk_push_query = self.query_patcher.start()
+        self.addCleanup(self.query_patcher.stop)
+
+        # Default response confirms a successful payment.
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'CheckoutRequestID': 'ws_CO_TEST_001',
+            'ResultCode': '0',
+            'ResultDesc': 'The service request is processed successfully.',
+        }
+
     def post_json(self, payload, client=None):
         return (client or self.client).post(
             self.url,
@@ -660,7 +695,6 @@ class MpesaCallbackTests(TestCase):
         self.assertEqual(self.order.status, 'paid')
         self.assertEqual(self.product.stock, 8)
 
-        # Verify that the M-Pesa receipt number was saved.
         self.assertEqual(
             self.payment.mpesa_receipt_number,
             'QGH123ABC',
@@ -680,6 +714,10 @@ class MpesaCallbackTests(TestCase):
                 movement_type=StockMovement.MovementType.RETURNED,
             ).count(),
             0,
+        )
+
+        self.mock_stk_push_query.assert_called_once_with(
+            'ws_CO_TEST_001'
         )
 
     def test_successful_callback_saves_mpesa_receipt_number(self):
@@ -744,6 +782,14 @@ class MpesaCallbackTests(TestCase):
     # --- failure ---
 
     def test_cancelled_payment_marks_it_failed_and_returns_the_stock(self):
+        # The query must independently confirm the same failed result.
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'CheckoutRequestID': 'ws_CO_TEST_001',
+            'ResultCode': '1032',
+            'ResultDesc': 'Request cancelled by user.',
+        }
+
         response = self.post_json(callback_payload(result_code=1032))
 
         self.assertEqual(response.status_code, 200)
@@ -763,6 +809,152 @@ class MpesaCallbackTests(TestCase):
             ).count(),
             1,
         )
+
+    # --- STK Push Query verification ---
+
+    def test_query_timeout_leaves_payment_pending(self):
+        self.mock_stk_push_query.side_effect = Timeout(
+            'Safaricom query timed out'
+        )
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.payment.mpesa_receipt_number, '')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_query_checkout_id_mismatch_leaves_payment_pending(self):
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'CheckoutRequestID': 'ws_CO_DIFFERENT',
+            'ResultCode': '0',
+            'ResultDesc': 'The service request is processed successfully.',
+        }
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.payment.mpesa_receipt_number, '')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_query_result_mismatch_leaves_payment_pending(self):
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'CheckoutRequestID': 'ws_CO_TEST_001',
+            'ResultCode': '1032',
+            'ResultDesc': 'Request cancelled by user.',
+        }
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.payment.mpesa_receipt_number, '')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_query_without_result_code_leaves_payment_pending(self):
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'CheckoutRequestID': 'ws_CO_TEST_001',
+            'ResultDesc': 'The service request is processed successfully.',
+        }
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.payment.mpesa_receipt_number, '')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_query_nonzero_response_code_leaves_payment_pending(self):
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '1',
+            'CheckoutRequestID': 'ws_CO_TEST_001',
+            'ResultCode': '0',
+        }
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(self.payment.mpesa_receipt_number, '')
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_query_missing_checkout_id_leaves_payment_pending(self):
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'ResultCode': '0',
+        }
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_query_invalid_result_code_leaves_payment_pending(self):
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'CheckoutRequestID': 'ws_CO_TEST_001',
+            'ResultCode': 'invalid',
+        }
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_query_non_dictionary_response_leaves_payment_pending(self):
+        self.mock_stk_push_query.return_value = None
+
+        response = self.post_json(callback_payload(result_code=0))
+
+        self.assertEqual(response.status_code, 200)
+
+        self.refresh()
+
+        self.assertEqual(self.payment.status, 'pending')
+        self.assertEqual(self.order.status, 'pending')
+        self.assertEqual(self.product.stock, 8)
+        self.assertEqual(len(mail.outbox), 0)
 
     # --- repeated callbacks ---
 
@@ -787,7 +979,6 @@ class MpesaCallbackTests(TestCase):
             0,
         )
 
-
     def test_a_late_failure_cannot_undo_a_completed_payment(self):
         self.post_json(callback_payload(result_code=0))
         self.post_json(callback_payload(result_code=1032))
@@ -807,6 +998,13 @@ class MpesaCallbackTests(TestCase):
         )
 
     def test_repeated_failure_callback_returns_the_stock_only_once(self):
+        self.mock_stk_push_query.return_value = {
+            'ResponseCode': '0',
+            'CheckoutRequestID': 'ws_CO_TEST_001',
+            'ResultCode': '1032',
+            'ResultDesc': 'Request cancelled by user.',
+        }
+
         self.post_json(callback_payload(result_code=1032))
         self.post_json(callback_payload(result_code=1032))
 
@@ -847,6 +1045,8 @@ class MpesaCallbackTests(TestCase):
             0,
         )
 
+        self.mock_stk_push_query.assert_not_called()
+
     def test_malformed_payloads_are_rejected_with_400(self):
         bad_payloads = {
             'not json': 'this is not json',
@@ -855,7 +1055,13 @@ class MpesaCallbackTests(TestCase):
             'null body': json.dumps({'Body': None}),
             'a list': '[]',
             'missing result code': json.dumps(
-                {'Body': {'stkCallback': {'CheckoutRequestID': 'ws_CO_TEST_001'}}}
+                {
+                    'Body': {
+                        'stkCallback': {
+                            'CheckoutRequestID': 'ws_CO_TEST_001'
+                        }
+                    }
+                }
             ),
             'non-numeric result code': json.dumps(
                 callback_payload(result_code='abc')

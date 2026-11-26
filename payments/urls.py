@@ -8,4 +8,9 @@ urlpatterns = [
         views.mpesa_callback,
         name='mpesa_callback',
     ),
+    path(
+        'status/<str:token>/',
+        views.payment_status,
+        name='payment_status',
+    ),
 ]

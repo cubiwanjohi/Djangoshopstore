@@ -2,7 +2,6 @@
 import json
 from decimal import Decimal
 from unittest.mock import patch
-
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -338,6 +337,7 @@ class CheckoutTests(TestCase):
         mock_stk_push.assert_called_once()
         mock_send_order_confirmation.assert_called_once()
 
+
 class MpesaCallbackTests(TestCase):
     """Test successful and failed M-Pesa callbacks."""
 
@@ -386,9 +386,21 @@ class MpesaCallbackTests(TestCase):
         )
 
     def test_successful_callback_marks_order_paid(self):
-        response = self.send_callback(0)
+        verified_query_response = {
+            "ResponseCode": 0,
+            "CheckoutRequestID": "TEST-CHECKOUT-456",
+            "ResultCode": 0,
+            "ResultDesc": "The service request is processed successfully.",
+        }
+
+        with patch(
+            "payments.views.stk_push_query",
+            return_value=verified_query_response,
+        ) as mock_query:
+            response = self.send_callback(0)
 
         self.assertEqual(response.status_code, 200)
+        mock_query.assert_called_once_with("TEST-CHECKOUT-456")
 
         self.payment.refresh_from_db()
         self.order.refresh_from_db()
@@ -401,9 +413,21 @@ class MpesaCallbackTests(TestCase):
         )
 
     def test_failed_callback_marks_payment_failed(self):
-        response = self.send_callback(1)
+        verified_query_response = {
+            "ResponseCode": 0,
+            "CheckoutRequestID": "TEST-CHECKOUT-456",
+            "ResultCode": 1,
+            "ResultDesc": "The service request failed.",
+        }
+
+        with patch(
+            "payments.views.stk_push_query",
+            return_value=verified_query_response,
+        ) as mock_query:
+            response = self.send_callback(1)
 
         self.assertEqual(response.status_code, 200)
+        mock_query.assert_called_once_with("TEST-CHECKOUT-456")
 
         self.payment.refresh_from_db()
         self.order.refresh_from_db()
